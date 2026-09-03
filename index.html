@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank · Budget Tracker</title>
+    <meta name="theme-color" content="#322D29">
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('bank_theme') } catch (e) { }
+            if (t !== 'dark' && t !== 'light') {
+                t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', t);
+            /* if a PIN is set, keep the page hidden until it is entered */
+            try {
+                var raw = localStorage.getItem('bank_v4');
+                if (raw && JSON.parse(raw).settings && JSON.parse(raw).settings.pin) {
+                    document.documentElement.classList.add('locked-boot');
+                }
+            } catch (e) { }
+        })();
+    </script>
+    <!-- Installable / offline. Everything below is cached by sw.js after the first visit. -->
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./icon.svg">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tracker">
+    <meta name="description" content="A private, offline-first budget and expense tracker. All data stays on this device.">
+
+    <!-- Webfonts are a nicety, not a dependency: the stacks below fall back to
+         Georgia / system-ui, so the app is fully usable with no network. -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body>
+
+    <div class="bg-decor" id="bgDecor" aria-hidden="true"></div>
+
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-brand">
+                <div class="header-mark" id="headerMark" aria-hidden="true">B</div>
+                <div>
+                    <div class="header-title" id="headerTitle">Bank</div>
+                    <span class="header-subtitle" id="headerTagline">Money Tracker</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="offline-pill" id="offlinePill" role="status" title="No internet — the tracker keeps working, everything is stored on this device">Offline</span>
+                <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch appearance"
+                    aria-label="Switch between light and dark mode">
+                    <span id="themeIcon"></span>
+                    <span class="theme-toggle-label" id="themeLabel">Light</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <div class="account-tabs" role="tablist" aria-label="Budget account">
+            <button class="account-tab active" data-account="bank" id="tabBtn_bank" role="tab"
+                onclick="setAccount('bank')">Bank</button>
+            <button class="account-tab" data-account="cash" id="tabBtn_cash" role="tab"
+                onclick="setAccount('cash')">Cash</button>
+        </div>
+
+        <div class="notice" id="dataNotice">
+            <div class="notice-body">
+                <div class="notice-title">Keep a copy of your records</div>
+                <p>This tracker keeps your budget <strong>on this device only</strong> — like a notebook that
+                    stays in this browser. Nothing is sent anywhere, and nobody else can see it. But if you
+                    <strong>clear your browsing data or history</strong>, browse in a private/incognito window, or
+                    open the tracker on another phone or computer, you will find it empty. Download a backup file
+                    now and then so you can always bring your records back.
+                </p>
+                <div class="notice-actions">
+                    <button class="notice-btn" onclick="openBackup();dismissNotice()">Download a backup</button>
+                    <button class="notice-btn ghost" onclick="dismissNotice()">Got it</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="budget-card">
+            <div class="budget-card-deco"></div>
+            <div class="budget-eyebrow">Total Budget · <span id="eyebrowAccount">Bank</span>
+                <button id="eyeBtn" onclick="toggleVisibility()" aria-label="Hide amounts" aria-pressed="false"
+                    style="background:none;border:none;cursor:pointer;margin-left:6px;opacity:.75;color:var(--on-ink-dim);transition:opacity .2s;display:flex;align-items:center;"
+                    title="Toggle visibility">
+                    <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="budget-amount-row">
+                <div class="budget-amount" id="budgetDisplay">₱0.00</div>
+            </div>
+            <div class="budget-actions">
+                <button class="btn-add-money" onclick="openAddMoney()">＋ Add Money</button>
+                <button class="btn-transfer" onclick="openTransfer()">⇄ Transfer</button>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-pill">
+                    <span class="stat-label">Total Spent</span>
+                    <span class="stat-value red" id="totalSpent">₱0.00</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-label">Remaining (<span id="remainingLabel">Bank</span>)</span>
+                    <span class="stat-value green" id="totalRemaining">₱0.00</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-label">Remaining (Categories)</span>
+                    <span class="stat-value yellow" id="catTotalRemaining">₱0.00</span>
+                    <span class="stat-hint" id="catRemHint">left in this month's categories</span>
+                </div>
+                <div class="stat-pill" id="diffPill">
+                    <span class="stat-label" id="diffLabel">Excess</span>
+                    <span class="stat-value green" id="diffVal">₱0.00</span>
+                    <span class="stat-hint" id="diffHint">unallocated from this account</span>
+                </div>
+            </div>
+            <div class="progress-section">
+                <div class="progress-track">
+                    <div class="progress-bar" id="totalProgress" style="width:0%"></div>
+                </div>
+                <div class="progress-meta">
+                    <span class="progress-label">Budget utilisation</span>
+                    <span class="progress-label" id="progressPct">0% used</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-row">
+            <button class="btn-manual" onclick="openManual()">User Manual</button>
+            <div class="dropdown-wrap" id="dataDropdown">
+                <button class="btn-data-menu" onclick="toggleDataMenu()">Data ▾</button>
+                <div class="data-menu" id="dataMenu">
+                    <button class="data-menu-item" id="lockMenuItem" style="display:none"
+                        onclick="lockNow();closeDataMenu()">Lock tracker</button>
+                    <button class="data-menu-item" onclick="openSettings();closeDataMenu()">Settings</button>
+                    <button class="data-menu-item" onclick="openBackup();closeDataMenu()">Backup &amp; Restore</button>
+                    <button class="data-menu-item danger-item" id="resetMenuItem"
+                        onclick="resetAll();closeDataMenu()">Reset Bank Data</button>
+                </div>
+            </div>
+            <button class="btn-loans" id="btnLoans" onclick="openLoans()">Loans</button>
+            <button class="btn-logs" id="btnGoals" onclick="openGoals()">Savings</button>
+            <button class="btn-logs" onclick="openLogs()">Logs</button>
+            <button class="btn-logs" onclick="openCharts()">Charts</button>
+            <button class="btn-report" onclick="openReport()">Reports</button>
+        </div>
+
+        <div class="period-wrap">
+            <div class="period-bar" id="periodBar">
+                <button class="period-nav" onclick="stepPeriod(-1)" title="Previous month"
+                    aria-label="Previous month">‹</button>
+                <div class="period-info">
+                    <div class="period-label" id="periodLabel">This month</div>
+                    <div class="period-sub" id="periodSub">₱0.00 spent of ₱0.00 budgeted</div>
+                </div>
+                <button class="period-nav" onclick="stepPeriod(1)" title="Next month" aria-label="Next month">›</button>
+                <button class="period-today" id="periodToday" onclick="goToThisMonth()">This month</button>
+            </div>
+        </div>
+
+        <div class="section-header">
+            <div class="section-title">Budget Categories</div>
+            <button class="btn-add-cat" onclick="toggleAddForm()">＋ Add Category</button>
+        </div>
+
+        <div class="add-cat-form" id="addCatForm">
+            <div class="form-row">
+                <input type="text" id="newCatName" placeholder="Category name (e.g. Groceries)" maxlength="30">
+                <input type="number" id="newCatBudget" placeholder="Budget (₱)" data-cur-ph="Budget ({c})" min="0"
+                    step="0.01">
+            </div>
+            <div class="form-row" style="margin-top:10px;">
+                <button class="btn-form-add" onclick="addCategory()">Add Category</button>
+                <button class="btn-form-cancel" onclick="toggleAddForm()">Cancel</button>
+            </div>
+        </div>
+
+        <div class="cat-sort-bar" id="catSortBar" role="group" aria-label="Order categories">
+            <span class="cat-sort-label">Order</span>
+            <button class="cat-sort-btn" data-sort="custom" onclick="setCatSort('custom')">My order</button>
+            <button class="cat-sort-btn" data-sort="name" onclick="setCatSort('name')">Name</button>
+            <button class="cat-sort-btn" data-sort="remaining" onclick="setCatSort('remaining')">Remaining</button>
+            <button class="cat-sort-btn" data-sort="spent" onclick="setCatSort('spent')">Most spent</button>
+            <button class="cat-sort-dir" id="catSortDir" onclick="toggleCatSortDir()"
+                title="Reverse the order" aria-label="Reverse the order">↓</button>
+        </div>
+
+        <div class="categories" id="categoriesList"></div>
+        <div class="empty-state" id="emptyState">
+            <div class="orb">◆</div>
+            <p><strong>No categories yet.</strong><br>Add your first budget category above<br>to start tracking your
+                spending.</p>
+        </div>
+
+        <footer class="app-footer">
+            <p>
+                Your records are saved <strong>on this device only</strong>. Clearing your browsing data will erase
+                them. <button class="footer-link" onclick="openBackup()">Download a backup</button><br>
+                <span class="backup-age" id="backupAge">Last backup: never</span>
+            </p>
+        </footer>
+
+    </div>
+
+    <!-- Add Money Modal -->
+    <div class="modal-overlay" id="addMoneyModal">
+        <div class="modal add-money-modal">
+            <h3 id="addMoneyTitle">Add Money</h3>
+            <label>Note / Source</label>
+            <input type="text" id="addMoneyNote" placeholder="e.g. Salary, Allowance, Transfer" maxlength="60">
+            <label data-cur-label="Amount to Add">Amount to Add (₱)</label>
+            <input type="number" id="addMoneyAmount" placeholder="0.00" min="0" step="0.01">
+            <label>Date</label>
+            <input type="date" id="addMoneyDate">
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeAddMoney()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveAddMoney()">Add to Budget</button>
+            </div>
+            <!-- Money-in history -->
+            <div class="money-history">
+                <div class="money-history-title">
+                    <span>Money In &amp; Transfers</span>
+                </div>
+                <div class="money-history-list" id="moneyHistoryList">
+                    <div class="no-money-history">No money added yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="lock-screen" id="lockScreen">
+        <div class="lock-box" id="lockBox">
+            <div class="lock-mark" id="lockMark">B</div>
+            <div class="lock-title" id="lockTitle">Bank</div>
+            <p class="lock-sub" id="lockSub">Enter your PIN</p>
+            <div class="pin-dots" id="pinDots"></div>
+            <div class="keypad" id="keypad"></div>
+            <p class="lock-hint">Type your PIN on the keyboard, or tap the numbers</p>
+            <button class="lock-forgot" onclick="showLockHelp()">Forgot your PIN?</button>
+            <div class="lock-note" id="lockNote">Your records are kept on this device only, so there is no way to
+                reset a forgotten PIN. The only way back in is to clear this site's data in your browser settings —
+                which erases everything here — then restore from a backup file.</div>
+        </div>
+    </div>
+
+    <!-- PIN Setup Modal -->
+    <div class="modal-overlay" id="pinModal">
+        <div class="modal">
+            <h3 id="pinModalTitle">Set a PIN</h3>
+            <p id="pinModalHint" style="font-size:.78rem;color:var(--text-muted);margin:-6px 0 14px;line-height:1.6">
+            </p>
+            <div id="pinFieldCurrent" style="display:none">
+                <label>Current PIN</label>
+                <input type="password" id="pinCurrent" inputmode="numeric" maxlength="4" autocomplete="off">
+            </div>
+            <div id="pinFieldNew">
+                <label>New PIN (4 numbers)</label>
+                <input type="password" id="pinNew" inputmode="numeric" maxlength="4" autocomplete="off">
+                <label>Type it again</label>
+                <input type="password" id="pinConfirm" inputmode="numeric" maxlength="4" autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closePinModal()">Cancel</button>
+                <button class="btn-modal-save" id="pinSaveBtn" onclick="savePinModal()">Save PIN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="settings-modal">
+            <div class="logs-top">
+                <h3>Settings</h3>
+                <div class="logs-controls">
+                    <button class="btn-close-report" onclick="closeSettings()">✕ Close</button>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Money</div>
+                <label>Currency symbol</label>
+                <input type="text" id="setCurrency" maxlength="4" placeholder="₱">
+                <div class="cur-picks" id="curPicks"></div>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Your two accounts</div>
+                <label>Name of the first tab</label>
+                <input type="text" id="setLabelBank" maxlength="14" placeholder="Bank">
+                <label>Name of the second tab</label>
+                <input type="text" id="setLabelCash" maxlength="14" placeholder="Cash">
+                <p class="settings-hint">Rename them to match how you actually keep your money — GCash, Savings,
+                    Wallet, Palengke money.</p>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Budget month</div>
+                <label>Your budget month starts on day</label>
+                <input type="number" id="setCycleStart" min="1" max="28" step="1" placeholder="1">
+                <p class="settings-hint">Leave it at 1 for a normal calendar month. Set it to your payday — 15, say —
+                    and a budget month runs from the 15th to the 14th of the next month. Logs and Reports still list
+                    things by calendar month.</p>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">App lock</div>
+                <p class="lock-state" id="lockState"></p>
+                <div class="settings-btn-row" id="lockButtons"></div>
+                <label>Lock automatically after</label>
+                <select id="setLockAfter"></select>
+                <p class="settings-hint">With a PIN set, the tracker locks itself after the time you choose above —
+                    counted from the last time you touched the screen — and whenever you leave it for that long in
+                    the background. It is a lock on the screen, not on the file: someone who knows their way around a
+                    browser could still reach the data, so treat it as privacy, not a safe.</p>
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Name of this tracker</div>
+                <label>Title</label>
+                <input type="text" id="setAppName" maxlength="18" placeholder="Bank">
+                <label>Subtitle</label>
+                <input type="text" id="setAppTagline" maxlength="24" placeholder="Money Tracker">
+            </div>
+
+            <div class="settings-group">
+                <div class="settings-group-title">Look of this tracker</div>
+
+                <label>Colour theme</label>
+                <div class="theme-swatches" id="themeSwatches" role="group" aria-label="Colour theme"></div>
+                <div class="custom-colour-row" id="customColourRow">
+                    <label for="setAccent">Your own colour</label>
+                    <input type="color" id="setAccent" value="#72383D"
+                        oninput="setCustomAccent(this.value)">
+                </div>
+                <p class="settings-hint">One colour sets the whole palette. Light and dark are worked out from it
+                    separately, so whichever you pick is right in both — switch modes with the button in the corner
+                    to see.</p>
+
+                <label>Logo</label>
+                <div class="media-row">
+                    <div class="logo-preview" id="logoPreview" aria-hidden="true"><span>B</span></div>
+                    <div class="media-actions">
+                        <button type="button" class="media-btn"
+                            onclick="document.getElementById('logoFile').click()">Choose a picture</button>
+                        <button type="button" class="media-btn ghost" id="logoClearBtn" style="display:none"
+                            onclick="clearLogo()">Remove</button>
+                    </div>
+                </div>
+                <input type="file" id="logoFile" accept="image/*" hidden onchange="handleLogoFile(this)">
+                <p class="settings-hint">A square picture works best. Without one, the corner mark shows the first
+                    letter of your title.</p>
+
+                <label>Background</label>
+                <div class="media-row">
+                    <div class="bg-preview" id="bgPreview" aria-hidden="true"></div>
+                    <div class="media-actions">
+                        <button type="button" class="media-btn" data-bg-mode="default"
+                            onclick="setBgMode('default')">Built-in</button>
+                        <button type="button" class="media-btn" data-bg-mode="custom"
+                            onclick="setBgMode('custom')">My picture</button>
+                        <button type="button" class="media-btn" data-bg-mode="none"
+                            onclick="setBgMode('none')">Plain</button>
+                        <button type="button" class="media-btn ghost"
+                            onclick="document.getElementById('bgFile').click()">Choose a picture</button>
+                        <button type="button" class="media-btn ghost" id="bgClearBtn" style="display:none"
+                            onclick="clearBg()">Remove picture</button>
+                    </div>
+                </div>
+                <input type="file" id="bgFile" accept="image/*" hidden onchange="handleBgFile(this)">
+                <label for="setBgOpacity">How strong the background is — <span id="bgOpacityVal">100%</span></label>
+                <input type="range" id="setBgOpacity" min="0" max="100" step="5" value="100"
+                    oninput="setBgOpacity(this.value)" onchange="commitBgOpacity()">
+                <p class="settings-hint">Kept faint on purpose: the background is there to give the page a mood, not
+                    to compete with your figures. Pictures are stored separately from your records, so a large one
+                    can never stop your budget saving.</p>
+
+                <div class="settings-btn-row" style="margin-top:16px">
+                    <button type="button" class="storage-btn ghost" onclick="resetCustomisation()">Reset the name and
+                        look</button>
+                </div>
+                <p class="settings-hint">Puts the title, subtitle, colour theme, logo and background back to how they
+                    started. Your records, categories, accounts and PIN are not touched.</p>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeSettings()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveSettings()">Save settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loans Modal -->
+    <div class="modal-overlay" id="loansModal">
+        <div class="loans-modal">
+            <div class="logs-top">
+                <h3 id="loansTitle">Loans</h3>
+                <div class="logs-controls">
+                    <button class="logs-filter-btn active" id="loanFilterOpen"
+                        onclick="setLoansFilter('open')">Active</button>
+                    <button class="logs-filter-btn" id="loanFilterSettled" onclick="setLoansFilter('settled')">Paid
+                        off</button>
+                    <button class="logs-filter-btn" id="loanFilterAll" onclick="setLoansFilter('all')">All</button>
+                    <button class="btn-close-report" onclick="closeLoans()">✕ Close</button>
+                </div>
+            </div>
+            <div class="loans-summary">
+                <div class="loans-box owed">
+                    <span class="loans-box-label">Still to pay</span>
+                    <span class="loans-box-value" id="loansOwed">₱0.00</span>
+                </div>
+                <div class="loans-box">
+                    <span class="loans-box-label">Paid so far</span>
+                    <span class="loans-box-value" id="loansRepaid">₱0.00</span>
+                </div>
+            </div>
+            <div class="loans-add-row">
+                <button class="loan-btn" onclick="openLoanForm()">＋ Add a loan</button>
+            </div>
+            <div id="loansList"></div>
+        </div>
+    </div>
+
+    <!-- Add / Edit Loan Modal -->
+    <div class="modal-overlay" id="loanFormModal">
+        <div class="modal">
+            <h3 id="loanFormTitle">Add a loan</h3>
+            <label>Loan name</label>
+            <input type="text" id="loanName" placeholder="e.g. Motorcycle loan" maxlength="40">
+            <label>Lender (optional)</label>
+            <input type="text" id="loanLender" placeholder="e.g. Home Credit, Cebuana, Tita Rosa" maxlength="40">
+            <label data-cur-label="Total amount to pay">Total amount to pay (₱)</label>
+            <input type="number" id="loanPrincipal" placeholder="0.00" min="0" step="0.01">
+            <label data-cur-label="Monthly payment, optional">Monthly payment, optional (₱)</label>
+            <input type="number" id="loanMonthly" placeholder="0.00" min="0" step="0.01">
+            <label>Payment day of the month</label>
+            <input type="number" id="loanDueDay" placeholder="e.g. 15" min="1" max="31" step="1">
+            <p style="font-size:.72rem;color:var(--text-muted);margin:8px 0 0;line-height:1.55">The day your payment
+                falls due each month. The tracker reminds you when that day is near and nothing has been paid yet
+                this month.</p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeLoanForm()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveLoanForm()">Save loan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div class="modal-overlay" id="transferModal">
+        <div class="modal add-money-modal">
+            <h3>Transfer Money</h3>
+            <label>Direction</label>
+            <div class="log-type-row" style="margin-bottom:2px;">
+                <button type="button" id="dirBankCash" class="log-type-btn active-spent"
+                    onclick="setTransferDir('bank')">Bank → Cash</button>
+                <button type="button" id="dirCashBank" class="log-type-btn" onclick="setTransferDir('cash')">Cash →
+                    Bank</button>
+            </div>
+            <label data-cur-label="Amount">Amount (₱)</label>
+            <input type="number" id="transferAmount" placeholder="0.00" min="0" step="0.01"
+                oninput="updateTransferHint()">
+            <label>Note (optional)</label>
+            <input type="text" id="transferNote" placeholder="e.g. ATM withdrawal" maxlength="60">
+            <label>Date</label>
+            <input type="date" id="transferDate">
+            <p class="transfer-hint" id="transferHint"></p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeTransfer()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveTransfer()">Move Money</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Manual Modal -->
+    <div class="modal-overlay" id="manualModal">
+        <div class="manual-modal">
+            <div class="manual-top">
+                <h3>User Manual</h3>
+                <button class="btn-close-report" onclick="closeManual()">✕ Close</button>
+            </div>
+            <p class="manual-intro">
+                A simple budget tracker for two separate wallets. You add money in, split it into categories,
+                then log what you spend. There is no sign-up and no password — you open the page and start using
+                it, and your records are saved on your own device as you go.
+            </p>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">01</span>Bank &amp; Cash tabs</h4>
+                <p>The two tabs at the top are completely separate books. Each one keeps its own budget,
+                    categories, expenses, money-in history, logs and reports — nothing crosses over.</p>
+                <ul>
+                    <li>Use <strong>Bank</strong> for money in your bank account or e-wallet.</li>
+                    <li>Use <strong>Cash</strong> for the money physically in your pocket.</li>
+                    <li>Whatever tab is highlighted is the one you are editing. The labels on the card follow it.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">02</span>Adding money</h4>
+                <p>Your total budget is not typed in directly — it is the sum of every deposit you record.</p>
+                <ul>
+                    <li>Tap <span class="manual-key">+ Add Money</span> on the dark card, enter a note
+                        (e.g. Salary), the amount and the date, then <strong>Add to Budget</strong>.</li>
+                    <li>Every deposit is listed under <strong>Money In &amp; Transfers</strong> in the same
+                        window, marked <span class="manual-key">In</span>.</li>
+                    <li>Made a mistake? Tap <span class="manual-key">✎</span> on a history row to edit it — the
+                        total budget adjusts by the difference automatically.</li>
+                    <li>Tap <span class="manual-key">×</span> to remove a deposit and subtract it from the budget.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">03</span>Budget categories</h4>
+                <p>Categories are envelopes you divide your money into — Groceries, Rent, Transport, and so on.
+                    The amount you give a category is its <strong>allowance for one month</strong>.</p>
+                <ul>
+                    <li>Tap <span class="manual-key">+ Add Category</span>, give it a name and a monthly amount.</li>
+                    <li>Tap a category row to open it and see its expenses.</li>
+                    <li><strong>Edit</strong> renames it or changes its budget. <strong>Delete</strong> removes it
+                        together with its expenses.</li>
+                    <li><strong>+ Add</strong> and <strong>− Deduct</strong> adjust that category's budget without
+                        touching your other categories.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">04</span>The monthly cycle</h4>
+                <p>Your categories start fresh every month. The bar above your categories shows which month you are
+                    looking at — use <span class="manual-key">‹</span> and <span class="manual-key">›</span> to move
+                    between months, and <span class="manual-key">This month</span> to jump back to today.</p>
+                <ul>
+                    <li>A category budget of ₱5,000 means ₱5,000 <strong>every month</strong> — not ₱5,000 for all
+                        time. When a new month begins, the category is full again automatically.</li>
+                    <li>Everything on a category card — what is spent, what is left, the progress bar and its list of
+                        expenses — belongs to the month shown in the bar.</li>
+                    <li>Move to a past month to review it, or to a future month to plan ahead. Adding an expense
+                        while a past month is open saves it to that month.</li>
+                    <li>Logging an expense dated in a different month is still allowed — it is simply filed there,
+                        and a message tells you where it went.</li>
+                </ul>
+                <p><strong>Changing one month only.</strong> Open a category's <strong>Edit</strong> and untick
+                    <em>Use this amount every month</em> to change just the month on screen — handy for a December
+                    with extra gifts, or a tight month. <span class="manual-key">+ Add</span> and
+                    <span class="manual-key">− Deduct</span> always apply to the month you are viewing.
+                </p>
+                <p>Your <strong>total budget</strong> at the top of the page is not monthly — it is the running
+                    balance of the account, all the money you have put in minus everything you have spent.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">05</span>Moving money between Bank and Cash</h4>
+                <p>Withdrawing cash, or putting cash back in the bank, is not spending — the money is only changing
+                    pockets. Use <span class="manual-key">⇄ Transfer</span> on the budget card so both tabs stay
+                    correct.</p>
+                <ul>
+                    <li>Pick the direction — <strong>Bank → Cash</strong> for a withdrawal,
+                        <strong>Cash → Bank</strong> for a deposit — then the amount, an optional note
+                        ("ATM withdrawal") and the date.
+                    </li>
+                    <li>One tap writes both sides: the money leaves one tab and arrives in the other, so your total
+                        across the two never changes by accident.</li>
+                    <li>A transfer is <strong>never counted as spending or as income</strong>. Your Total Spent does
+                        not move, and no category is touched.</li>
+                    <li>Before you confirm, the window shows what both balances will be afterwards. If a transfer
+                        would leave an account in the negative it warns you, but still lets you record it.</li>
+                </ul>
+                <p>Transfers appear in <strong>Money In &amp; Transfers</strong> on both tabs, marked
+                    <span class="manual-key">Out</span> on the account the money left and
+                    <span class="manual-key">In</span> on the one that received it. Editing the amount or date of
+                    either side updates the other automatically, and deleting one undoes the whole transfer on both
+                    tabs — the two books can never drift apart.
+                </p>
+                <p>In Reports, transfers are listed separately from <em>Money Added This Month</em>, so moving your
+                    own money around never looks like extra income.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">06</span>Logging expenses</h4>
+                <p>Open a category, then fill in the note, amount and date and press <span class="manual-key">+
+                        Log</span>.</p>
+                <ul>
+                    <li><strong>Spent</strong> — ordinary spending, gone for good.</li>
+                    <li><strong>Loan</strong> — money you paid towards a debt: an amortization, an instalment, a
+                        payment on something you borrowed. Choosing Loan adds a box where you pick
+                        <strong>which loan the payment is for</strong>, so the tracker knows how much of that debt
+                        is left. You can add a new loan right there with <span class="manual-key">＋ New loan</span>.
+                    </li>
+                    <li>Choose the type with the Spent / Loan switch before you press Log.</li>
+                    <li>On any expense row, <span class="manual-key">✎</span> edits it and <span
+                            class="manual-key">×</span>
+                        deletes it.</li>
+                    <li>Once a category is fully used, logging is locked until you raise its budget.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">07</span>Loans you are paying off</h4>
+                <p>Both <strong>Spent</strong> and <strong>Loan</strong> entries are money that has already left your
+                    pocket. The difference is that a Loan payment is chipping away at a debt — so the tracker keeps
+                    count of how much of that debt is left. Tap <span class="manual-key">Loans</span> to see them.</p>
+                <p><strong>First, add the loan.</strong> Tap <span class="manual-key">＋ Add a loan</span> and fill in:
+                </p>
+                <ul>
+                    <li><strong>Loan name</strong> — "Motorcycle loan", "Appliance loan", "Utang kay Tita".</li>
+                    <li><strong>Lender</strong> (optional) — who you are paying.</li>
+                    <li><strong>Total amount to pay</strong> — everything you owe on it, so the tracker can show what
+                        is left.</li>
+                    <li><strong>Monthly payment</strong> (optional) — how much you pay each time.</li>
+                    <li><strong>Payment day of the month</strong> (required) — the day your payment falls due, for
+                        example 15 if it is due every 15th. This is what the reminder is based on.</li>
+                </ul>
+                <p><strong>Then log each payment.</strong> In the category you paid it from, switch the type to
+                    <strong>Loan</strong>, choose the loan from the list, and log it as usual. The payment counts
+                    against that category's budget for the month, exactly like any other expense — because you really
+                    did spend it — and at the same time it reduces what you still owe.
+                </p>
+                <ul>
+                    <li>The Loans screen shows <strong>still to pay</strong> and <strong>paid so far</strong> across
+                        all your loans.</li>
+                    <li>Each loan has a progress bar, how much is left of the total, and a list of the payments you
+                        have made with their dates.</li>
+                    <li>The tracker watches that day for you each month. A loan reads <strong>Due on the
+                            15th</strong> while it is still far off, <strong>Due in 2 days</strong> as it gets close,
+                        <strong>Due today</strong> on the day itself, and turns red with <strong>Overdue — was due the
+                            15th</strong> once the day has passed with nothing paid this month.
+                    </li>
+                    <li>The <span class="manual-key">Loans</span> button shows a number whenever a payment is due
+                        within a week or already overdue, so you see it without opening anything.</li>
+                    <li>Log a payment and the loan turns green with <strong>Paid this month</strong> — the reminder
+                        stops until the next month begins, then starts watching again on its own.</li>
+                    <li>When the payments add up to the total, the loan is marked <strong>Paid off</strong>. Filter by
+                        <span class="manual-key">Active</span>, <span class="manual-key">Paid off</span> or
+                        <span class="manual-key">All</span>.
+                    </li>
+                    <li>Loan payments where you did not pick a loan are gathered under <em>"Loan payments not linked
+                            yet"</em> — edit any of them to attach it to a loan.</li>
+                </ul>
+                <p>Deleting a loan keeps its payments in your records as ordinary spending; they simply stop being
+                    linked to a loan. Nothing you have already spent is ever removed behind your back.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">08</span>Savings goals</h4>
+                <p>A goal is anything you are putting money aside for — an emergency fund, tuition, a new phone.
+                    Tap <span class="manual-key">Savings</span> to see them.</p>
+                <p><strong>Add a goal.</strong> Tap <span class="manual-key">＋ Add a goal</span> and give it a name and how much you need.
+                    A date is optional, but worth adding: with one, the tracker works out how much a month you need
+                    and tells you when you are falling behind.</p>
+                <p><strong>Put money in.</strong> Tap <span class="manual-key">Put money in</span> on a goal and choose where the money
+                    comes from:</p>
+                <ul>
+                    <li><strong>A category</strong> — it is recorded as an ordinary expense against that
+                        category's allowance, exactly like any other spending.</li>
+                    <li><strong>Excess money</strong> — whatever this account holds that your categories have not
+                        claimed. This choice only appears when there actually is excess. No category is touched;
+                        the money simply leaves the account, and shows up in Add Money history marked
+                        <span class="manual-key">Saved</span>, where you can take it back any time.</li>
+                </ul>
+                <p>Either way the money stops counting as money you can still spend, so nothing is counted twice.</p>
+                <ul>
+                    <li>Each goal shows a progress bar, what is left, and one of
+                        <span class="manual-key">On track</span>, <span class="manual-key">Behind</span>, <span class="manual-key">Date has passed</span> or <span class="manual-key">Reached</span>.</li>
+                    <li>The <span class="manual-key">Savings</span> button turns amber with a number when a goal has slipped behind or
+                        run past its date.</li>
+                    <li>Already logged something that belongs to a goal? Edit that expense with <span class="manual-key">✎</span> and pick
+                        the goal under <em>Counts toward a savings goal</em>.</li>
+                    <li>Deleting a goal keeps its deposits in your records — the money really did leave the
+                        account — and only unties them from the goal.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">09</span>Reading the summary card</h4>
+                <ul>
+                    <li><strong>Total Spent</strong> — everything you have ever logged, across all categories and
+                        all months.</li>
+                    <li><strong>Remaining</strong> — your total budget minus everything spent. This is the real
+                        money you have left.</li>
+                    <li><strong>Remaining (Categories)</strong> — what is still unspent inside your category
+                        budgets for <strong>the month you are viewing</strong>, added together.</li>
+                    <li><strong>Excess</strong> — you have money that is not assigned to any category yet.
+                        <strong>Short Budget</strong> — your categories promise more than you actually have.
+                        <strong>Balanced</strong> — every peso is allocated.
+                    </li>
+                    <li>The eye icon beside the title hides all amounts, for when someone is looking over your shoulder.
+                    </li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">10</span>Arranging your categories</h4>
+                <p>Above the category list is a row of orders: <span class="manual-key">My order</span>, <span class="manual-key">Name</span>,
+                    <span class="manual-key">Remaining</span> and <span class="manual-key">Most spent</span>. It appears once you have two or more categories.</p>
+                <ul>
+                    <li>Tap the order you are already on to flip it — A to Z becomes Z to A, largest becomes
+                        smallest. The small <span class="manual-key">↓</span> button on the right does the same.</li>
+                    <li><strong>Only <span class="manual-key">My order</span> is really yours.</strong> The other three are just a way of
+                        looking at the list, so switching to Name and back never loses the arrangement you made.</li>
+                    <li>In <span class="manual-key">My order</span>, each card grows a <span class="manual-key">⠿</span> grip on the left. Drag it to move the
+                        card. On a keyboard, move onto the grip with Tab and use <span class="manual-key">↑</span> and <span class="manual-key">↓</span>.</li>
+                    <li>Your choice is remembered, and travels in a backup file.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">11</span>Searching your records</h4>
+                <p>Tap <span class="manual-key">Logs</span>, or press <span class="manual-key">Ctrl</span>+<span class="manual-key">K</span> (<span class="manual-key">⌘</span>+<span class="manual-key">K</span> on a Mac) — or just
+                    <span class="manual-key">/</span> — from anywhere.</p>
+                <ul>
+                    <li><strong>It searches everything</strong>, not only expenses: spending, loan payments, money
+                        added, transfers and money set aside.</li>
+                    <li><strong>Every word must match.</strong> Typing <em>palengke sept</em> finds only entries
+                        that have both. Matches are highlighted in the results.</li>
+                    <li><strong>Any span of dates.</strong> <span class="manual-key">This month</span>, <span class="manual-key">Last 3 months</span>,
+                        <span class="manual-key">Last 6 months</span>, <span class="manual-key">This year</span>, <span class="manual-key">All time</span>, or <span class="manual-key">Custom…</span> for your own
+                        From and To dates.</li>
+                    <li><strong>Both accounts at once.</strong> Tap <span class="manual-key">Both accounts</span> and an Account column
+                        appears.</li>
+                    <li>Filter by <span class="manual-key">All</span>, <span class="manual-key">Spent</span>, <span class="manual-key">Loan</span>, <span class="manual-key">Money in</span> or
+                        <span class="manual-key">Transfers</span>.</li>
+                    <li><strong>Tap any result to open it.</strong> If it belongs to the other account the tracker
+                        switches over for you and keeps your search.</li>
+                    <li>Underneath: money out, money in and the net for whatever you are looking at.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">12</span>Reports and Charts</h4>
+                <p><strong><span class="manual-key">Reports</span></strong> groups every month's spending by category and shows the money
+                    you added, what was spent, loan payments and the grand total, with all-time figures at the
+                    bottom.</p>
+                <p><strong><span class="manual-key">Charts</span></strong> draws the same records four ways. Use the <span class="manual-key">‹</span> and
+                    <span class="manual-key">›</span> buttons at the top to choose the month; everything below follows it.</p>
+                <ul>
+                    <li><strong>Where the money went</strong> — a ring of that month's spending by category, with
+                        the total in the middle. The six largest get their own colour and the rest are gathered
+                        into <em>Other</em>.</li>
+                    <li><strong>Month by month</strong> — total spent each month for the last year. A month with
+                        nothing logged is shown as a real zero, not skipped. The month you are looking at is
+                        marked in orange.</li>
+                    <li><strong>Money in against money out</strong> — what came in beside what went out, with a
+                        strip underneath showing whether each month finished ahead or behind. Transfers to your
+                        other account count as money out, because they really did leave this one.</li>
+                    <li><strong>Budget against actual</strong> — how far into each allowance you are. Every bar's
+                        track ends at the same <em>allowance</em> line, so a bar crossing it is over budget, and
+                        those turn red.</li>
+                </ul>
+                <p>Hover or tap any part of a chart for the exact figures, and <span class="manual-key">Show numbers</span> swaps all four
+                    for plain tables. Hiding amounts with the <span class="manual-key">◉</span> eye also hides them here.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">13</span>Sending your records to someone</h4>
+                <p>The backup file is for bringing the tracker back. These are for sending your records to a
+                    spouse, an accountant, or anyone else. They are at the top of <span class="manual-key">Reports</span>.</p>
+                <p>First choose the scope: <span class="manual-key">Months</span> — all of them or just one — and <span class="manual-key">Accounts</span> — this
+                    one or both. The line underneath tells you exactly what will go out.</p>
+                <ul>
+                    <li><strong>Transactions (CSV)</strong> — every single entry: date, month, account, kind,
+                        category, type, note, amount and a signed amount.</li>
+                    <li><strong>Monthly summary (CSV)</strong> — one row per month: money in, transfers, money set
+                        aside, spent, loan payments, total out, budgeted and net.</li>
+                    <li><strong>Category budgets (CSV)</strong> — budget, spent, left and percent used per
+                        category, with an <em>Over budget</em> marker.</li>
+                    <li><strong>Print / Save as PDF</strong> — a clean printed sheet: month-by-month totals,
+                        budget against actual, savings goals, then every entry. In the print window choose your
+                        printer, or <em>Save as PDF</em> to get a file.</li>
+                </ul>
+                <p>The CSV files open in Excel, Numbers and Google Sheets. Amounts are always written in full, even
+                    when the eye is hiding them on screen — a hidden export would be no use to whoever you send
+                    it to.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">14</span>Settings</h4>
+                <p>Open <span class="manual-key">Data ▾</span> → <span class="manual-key">Settings</span> to make the tracker fit the way you actually handle
+                    money.</p>
+                <ul>
+                    <li><strong>Currency symbol</strong> — tap one of the ready symbols or type your own. Every
+                        amount, label and placeholder in the tracker changes to match.</li>
+                    <li><strong>Names of the two tabs</strong> — "Bank" and "Cash" are only defaults. Rename them to
+                        GCash, Savings, Wallet, Palengke money, anything. The names follow through the whole app,
+                        including the transfer window and the summary card.</li>
+                    <li><strong>Budget month starts on day</strong> — leave it at 1 for an ordinary calendar month.
+                        Set it to your payday and the budget month follows your salary instead: start it on 15 and a
+                        budget month runs from the 15th to the 14th of the next month, shown as
+                        <em>"Aug 15 – Sep 14, 2026"</em> in the month bar. Everything on the category cards, in
+                        Charts and in the date ranges follows that cycle.
+                    </li>
+                    <li><strong>App lock</strong> — a PIN for opening the tracker, described below.</li>
+                    <li><strong>Name of this tracker</strong> — the title and subtitle in the top-left corner, and
+                        the name shown on the browser tab. The corner mark shows the first letter of your title,
+                        unless you give it a logo.</li>
+                    <li><strong>Look of this tracker</strong> — colours, logo and background, described further
+                        down.</li>
+                </ul>
+                <p><strong>Locking the tracker.</strong> Tap <span class="manual-key">Set a PIN</span> and choose
+                    4 numbers. From then on the tracker asks for that PIN whenever it opens, and locks itself again
+                    after the time you pick under <em>Lock automatically after</em> — 30 seconds, 1, 5, 10 or 30
+                    minutes without touching it, or Never. It also locks if you leave it sitting in the background
+                    that long. To lock it yourself straight away, use <span class="manual-key">Data ▾</span> → <span class="manual-key">Lock tracker</span>.
+                </p>
+                <ul>
+                    <li><strong>Change PIN</strong> and <strong>Turn off lock</strong> both ask for your current PIN
+                        first.</li>
+                    <li>Your PIN itself is never saved — only a scrambled version of it, so it cannot be read back
+                        out of your records.</li>
+                    <li><strong>A forgotten PIN cannot be reset.</strong> Your records live only on this device, so
+                        nobody can unlock it for you. The only way back in is to clear this site's data in your
+                        browser — which erases everything — then restore from a backup file.</li>
+                    <li>Treat the lock as privacy rather than a safe: it hides the screen from anyone who picks up
+                        your phone, but the records themselves are still stored in plain form on the device.</li>
+                </ul>
+                <p>Settings are saved together with your records, so a backup file carries them to your next
+                    device.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">15</span>Backup, restore and recovery</h4>
+                <p>Found under <span class="manual-key">Data ▾</span>. This is how you move your records to another
+                    phone or computer, and how you protect them.</p>
+                <ul>
+                    <li><strong>Download Backup File</strong> saves one .json file containing <em>both</em> tabs,
+                        your settings, and your logo and background.</li>
+                    <li><strong>Restore</strong> replaces what is on this device with the backup's contents.</li>
+                    <li><strong>Merge</strong> adds the backup's records to what you already have, skipping
+                        duplicates — useful for combining two devices. A merge keeps the look already on this
+                        device.</li>
+                    <li><strong>Reset</strong> clears only the tab you are currently viewing; the other tab is
+                        left untouched.</li>
+                </ul>
+                <p><strong>If your records ever cannot be read.</strong> A save cut short by a flat battery, or
+                    something else writing over the tracker's storage, used to leave you looking at an empty
+                    tracker with no explanation. Now it says so, and:</p>
+                <ul>
+                    <li><strong>Nothing is deleted, and nothing new is saved</strong> until you choose what to do —
+                        so the damaged copy cannot be written over by accident.</li>
+                    <li><strong>Restore the last good copy</strong> — the tracker quietly keeps a copy of the last
+                        version that opened cleanly, and offers it back to you with its date.</li>
+                    <li><strong>Restore from a backup file</strong>, or <strong>download the damaged copy</strong>
+                        to keep it safe, or <strong>start fresh</strong> if you would rather begin blank.</li>
+                    <li>If only <em>part</em> of your records is damaged, the tracker opens with everything it
+                        could read and tells you exactly what was left out.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">16</span>The look of your tracker</h4>
+                <p>The button in the top-right switches between <strong>Light</strong> and <strong>Dark</strong>,
+                    and your choice is remembered. The first time you open the tracker it follows whatever your
+                    phone or computer is set to.</p>
+                <p>Everything else lives in <span class="manual-key">Data ▾</span> → <span class="manual-key">Settings</span> → <em>Look of this tracker</em>.</p>
+                <ul>
+                    <li><strong>Colour theme</strong> — <span class="manual-key">Default</span> is the original look. Then
+                        <span class="manual-key">Luxe</span>, <span class="manual-key">Ember</span>, <span class="manual-key">Fern</span>, <span class="manual-key">Harbour</span>, <span class="manual-key">Indigo</span> and
+                        <span class="manual-key">Plum</span>, each with its own matching backdrop. <span class="manual-key">Custom</span> lets you pick any colour
+                        you like.</li>
+                    <li><strong>One colour sets the whole palette</strong>, and light and dark are worked out from
+                        it separately — so whatever you choose is right in both. A colour too pale to read is
+                        deepened automatically rather than left illegible.</li>
+                    <li><strong>Logo</strong> — choose any picture and it replaces the letter in the corner mark
+                        and on the lock screen. A square picture works best. <span class="manual-key">Remove</span> puts the letter back.</li>
+                    <li><strong>Background</strong> — <span class="manual-key">Built-in</span> uses the artwork that comes with your theme,
+                        <span class="manual-key">My picture</span> uses one of your own, and <span class="manual-key">Plain</span> turns it off altogether.</li>
+                    <li><strong>How strong the background is</strong> — your own picture starts faint on purpose,
+                        because the background is there to give the page a mood, not to compete with your figures.
+                        The slider takes it up or down.</li>
+                    <li><strong>Reset the name and look</strong> puts the title, subtitle, theme, logo and
+                        background back to how they started. Your records, categories, accounts and PIN are not
+                        touched.</li>
+                </ul>
+                <p>Pictures are stored separately from your records, so even a large one can never stop your
+                    budget saving.</p>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">17</span>Keyboard</h4>
+                <p>Everything can be done with a mouse or a finger, but a keyboard is quicker.</p>
+                <ul>
+                    <li><span class="manual-key">Ctrl</span>+<span class="manual-key">K</span> (or <span class="manual-key">⌘</span>+<span class="manual-key">K</span>), or just <span class="manual-key">/</span>, opens search from
+                        anywhere.</li>
+                    <li><span class="manual-key">Esc</span> closes whatever window is open. With two open, it closes the top one first.</li>
+                    <li>Clicking the dimmed area outside a window closes it too — but only if you both press and
+                        release out there, so selecting text inside a form and drifting off the edge will not throw
+                        your work away.</li>
+                    <li><span class="manual-key">Tab</span> stays inside an open window and cannot wander onto the page behind it. When
+                        the window closes, the keyboard goes back to whatever you were on.</li>
+                    <li><span class="manual-key">Enter</span> in an amount box logs that expense.</li>
+                    <li>On a category's <span class="manual-key">⠿</span> grip, <span class="manual-key">↑</span> and <span class="manual-key">↓</span> move the category.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section">
+                <h4><span class="manual-num">18</span>Do I need internet?</h4>
+                <p><strong>Only the first time.</strong> Opening the tracker once with a connection is enough — after
+                    that it keeps its own copy of the page on your device and opens with no signal at all, on a
+                    plane, in a basement, anywhere.</p>
+                <ul>
+                    <li>A <span class="manual-key">Offline</span> badge appears in the top-right when there is no connection, to say the
+                        tracker is still working normally.</li>
+                    <li>Everything you type is saved to your own device instantly. It does not travel over the
+                        internet and it is not stored on any server.</li>
+                    <li>Nobody else — not even the person who made this tracker — can see your budget.</li>
+                    <li>You can add it to your home screen and open it like an app.</li>
+                    <li>When a newer version is ready, a small bar offers to reload. Nothing is lost either way.</li>
+                    <li>The backdrop for a theme you have never opened is fetched the first time you choose it, so
+                        pick your theme while you still have a connection.</li>
+                </ul>
+            </div>
+
+            <div class="manual-note">
+                <div class="manual-note-title">Please read — your records can be erased</div>
+                <p>Think of this tracker as a notebook kept inside <strong>this one browser, on this one
+                        device</strong>. It is private, but it is also the only copy.</p>
+                <p style="margin-top:8px">You will find the tracker <strong>empty</strong> if you:</p>
+                <ul style="margin-top:6px">
+                    <li>clear your browsing data, history or "site data" — this is the most common way people lose
+                        their records</li>
+                    <li>use a private or incognito window</li>
+                    <li>open the tracker on a different phone, computer or browser</li>
+                    <li>uninstall or reset your browser</li>
+                </ul>
+                <p style="margin-top:10px"><strong>If saving ever stops working</strong>, a red bar appears at the
+                    bottom of the screen telling you so — it means the browser is refusing to store anything (a
+                    private window, site data switched off, or a device with no space left). Nothing you type after
+                    that is kept, so tap <strong>Download a backup</strong> in that bar straight away, then fix the
+                    cause and tap <strong>Try again</strong>. The tracker never fails quietly.</p>
+                <p style="margin-top:10px">If your saved records are ever damaged, an amber bar tells you instead of
+                    silently starting empty. Your old data is kept aside and nothing new is saved until you decide,
+                    so it cannot be written over. The tracker also keeps <strong>an automatic copy of the last
+                    version that opened cleanly</strong> and offers it back to you with its date — so even without a
+                    backup file there is usually a way home. You can also restore a backup, download the damaged
+                    copy, or start fresh.</p>
+                <p style="margin-top:10px">The fix is simple: open <strong>Data → Backup &amp; Restore</strong> and
+                    tap <strong>Download Backup File</strong> every so often — after payday is a good habit. Keep
+                    that file somewhere safe like your email or cloud drive. If your records ever disappear, or you
+                    move to a new phone, open the tracker there and use <strong>Restore</strong> to bring
+                    everything back exactly as it was.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Money-In Modal -->
+    <div class="modal-overlay" id="editMoneyModal">
+        <div class="modal add-money-modal">
+            <h3>Edit Money Added</h3>
+            <label>Note / Source</label>
+            <input type="text" id="editMoneyNote" placeholder="e.g. Salary, Allowance, Transfer" maxlength="60">
+            <label data-cur-label="Amount">Amount (₱)</label>
+            <input type="number" id="editMoneyAmount" placeholder="0.00" min="0" step="0.01">
+            <label>Date</label>
+            <input type="date" id="editMoneyDate">
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeEditMoney()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveEditMoney()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3 id="editCatTitle">Edit Category</h3>
+            <label>Category Name</label>
+            <input type="text" id="editName" maxlength="30">
+            <label id="editBudgetLabel">Budget for this month (₱)</label>
+            <input type="number" id="editBudgetAmount" min="0" step="0.01">
+            <div class="edit-toggle-row">
+                <input type="checkbox" id="editApplyAll" checked>
+                <label for="editApplyAll">Use this amount <strong>every month</strong> — untick to change only the
+                    month you are viewing.</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeEditModal()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <!-- Savings goals / sinking funds -->
+    <div class="modal-overlay" id="goalsModal">
+        <div class="goals-modal">
+            <div class="logs-top">
+                <h3 id="goalsTitle">Savings Goals</h3>
+                <div class="logs-controls">
+                    <button class="logs-filter-btn active" id="goalFilterOpen"
+                        onclick="setGoalsFilter('open')">Saving</button>
+                    <button class="logs-filter-btn" id="goalFilterDone"
+                        onclick="setGoalsFilter('done')">Reached</button>
+                    <button class="logs-filter-btn" id="goalFilterAll" onclick="setGoalsFilter('all')">All</button>
+                    <button class="btn-close-report" onclick="closeGoals()">✕ Close</button>
+                </div>
+            </div>
+            <div class="goals-summary">
+                <div class="goals-box saved">
+                    <span class="goals-box-label">Put aside</span>
+                    <span class="goals-box-value" id="goalsSaved">₱0.00</span>
+                </div>
+                <div class="goals-box">
+                    <span class="goals-box-label">Still to save</span>
+                    <span class="goals-box-value" id="goalsLeft">₱0.00</span>
+                </div>
+                <div class="goals-box">
+                    <span class="goals-box-label">Target</span>
+                    <span class="goals-box-value" id="goalsTarget">₱0.00</span>
+                </div>
+            </div>
+            <div class="goals-add-row">
+                <button class="goal-btn primary" onclick="openGoalForm()">＋ Add a goal</button>
+            </div>
+            <div id="goalsList"></div>
+        </div>
+    </div>
+
+    <!-- Add / edit a goal -->
+    <div class="modal-overlay" id="goalFormModal">
+        <div class="modal">
+            <h3 id="goalFormTitle">Add a goal</h3>
+            <label>What are you saving for?</label>
+            <input type="text" id="goalName" placeholder="e.g. Emergency fund, New laptop" maxlength="40">
+            <label data-cur-label="How much do you need">How much do you need (₱)</label>
+            <input type="number" id="goalTarget" placeholder="0.00" min="0" step="0.01">
+            <label>Have it by (optional)</label>
+            <input type="date" id="goalDate">
+            <label>Note (optional)</label>
+            <input type="text" id="goalNote" placeholder="e.g. 6 months of expenses" maxlength="60">
+            <p style="font-size:.72rem;color:var(--text-muted);margin:8px 0 0;line-height:1.55">Give it a date and
+                the tracker works out how much a month you need, and tells you when you are falling behind.</p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeGoalForm()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveGoalForm()">Save goal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Put money into a goal -->
+    <div class="modal-overlay" id="goalAddModal">
+        <div class="modal">
+            <h3 id="goalAddTitle">Add to goal</h3>
+            <p class="goal-add-note" id="goalAddHint"></p>
+            <label data-cur-label="Amount">Amount (₱)</label>
+            <input type="number" id="goalAddAmount" placeholder="0.00" min="0" step="0.01">
+            <label>Where does it come from?</label>
+            <select id="goalAddCat"></select>
+            <label>Note</label>
+            <input type="text" id="goalAddNote" placeholder="e.g. Set aside from salary" maxlength="60">
+            <label>Date</label>
+            <input type="date" id="goalAddDate">
+            <p style="font-size:.72rem;color:var(--text-muted);margin:8px 0 0;line-height:1.55">Either way the money
+                stops counting as money you can still spend. From a category it is recorded as an expense against that
+                allowance; from your excess it simply leaves the account, and you can take it back any time from Add
+                Money.</p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeGoalAdd()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveGoalAdd()">Put it aside</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Modal -->
+    <div class="modal-overlay" id="chartsModal">
+        <div class="charts-modal">
+            <div class="charts-top">
+                <h3 id="chartsTitle">Charts</h3>
+                <button class="btn-close-report" onclick="closeCharts()">✕ Close</button>
+            </div>
+            <!-- one filter row, scoping every chart below it -->
+            <div class="charts-filters">
+                <div class="charts-month">
+                    <button onclick="vizStepMonth(-1)" title="Previous month"
+                        aria-label="Previous month">‹</button>
+                    <span class="charts-month-label" id="chartsMonthLabel" aria-live="polite">This month</span>
+                    <button onclick="vizStepMonth(1)" title="Next month" aria-label="Next month">›</button>
+                </div>
+                <button class="charts-view-toggle" id="chartsViewToggle" aria-pressed="false"
+                    onclick="toggleChartsTable()">Show numbers</button>
+            </div>
+            <div id="chartsBody"></div>
+        </div>
+    </div>
+    <div class="viz-tip" id="vizTip" role="status" aria-live="polite"></div>
+
+    <!-- Filled in by printReport(); the only thing @media print shows. -->
+    <div id="printSheet" aria-hidden="true"></div>
+
+    <div class="modal-overlay" id="reportModal">
+        <div class="report-modal">
+            <div class="report-top">
+                <h3 id="reportTitle">Monthly Report</h3>
+                <button class="btn-close-report" onclick="closeReport()">✕ Close</button>
+            </div>
+
+            <!-- Send this to someone: spreadsheets for an accountant, a
+                 printed sheet or PDF for anyone else. -->
+            <div class="export-bar">
+                <div class="export-scope">
+                    <div class="export-field">
+                        <label for="exportMonth">Months</label>
+                        <select id="exportMonth" onchange="renderExportHint()"></select>
+                    </div>
+                    <div class="export-field">
+                        <label for="exportAccount">Accounts</label>
+                        <select id="exportAccount" onchange="refreshExportMonths()">
+                            <option value="active">This account</option>
+                            <option value="both">Both accounts</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="export-actions">
+                    <button class="export-btn" onclick="exportTransactionsCsv()">Transactions (CSV)</button>
+                    <button class="export-btn" onclick="exportSummaryCsv()">Monthly summary (CSV)</button>
+                    <button class="export-btn" onclick="exportBudgetsCsv()">Category budgets (CSV)</button>
+                    <button class="export-btn primary" onclick="printReport()">Print / Save as PDF</button>
+                </div>
+                <p class="export-hint" id="exportHint"></p>
+            </div>
+
+            <div id="reportBody"></div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div class="modal-overlay" id="logsModal">
+        <div class="logs-modal">
+            <div class="logs-top">
+                <h3 id="logsTitle">All Logs</h3>
+                <div class="logs-controls">
+                    <input type="search" class="logs-search" id="logsSearch" autocomplete="off"
+                        placeholder="Search notes, categories, amounts…" oninput="renderLogsTable()">
+                    <span class="logs-count" id="logsCount">0 entries</span>
+                    <button class="btn-close-report" onclick="closeLogs()">✕ Close</button>
+                </div>
+            </div>
+
+            <!-- one toolbar scoping everything below: how far back, what kind,
+                 and which account(s) -->
+            <div class="logs-toolbar">
+                <div class="logs-chip-row" role="group" aria-label="Date range">
+                    <button class="logs-range-btn" data-range="month"
+                        onclick="setLogsRange('month')">This month</button>
+                    <button class="logs-range-btn" data-range="3m" onclick="setLogsRange('3m')">Last 3
+                        months</button>
+                    <button class="logs-range-btn" data-range="6m" onclick="setLogsRange('6m')">Last 6
+                        months</button>
+                    <button class="logs-range-btn" data-range="year" onclick="setLogsRange('year')">This
+                        year</button>
+                    <button class="logs-range-btn" data-range="all" onclick="setLogsRange('all')">All time</button>
+                    <button class="logs-range-btn" data-range="custom" onclick="setLogsRange('custom')">Custom…</button>
+                </div>
+                <div class="logs-custom" id="logsCustom">
+                    <label for="logsFrom">From</label>
+                    <input type="date" id="logsFrom" onchange="onLogsCustomDate()">
+                    <label for="logsTo">To</label>
+                    <input type="date" id="logsTo" onchange="onLogsCustomDate()">
+                </div>
+                <div class="logs-chip-row" role="group" aria-label="Filter entries">
+                    <button class="logs-filter-btn active" id="filterAll" onclick="setLogsFilter('all')">All</button>
+                    <button class="logs-filter-btn" id="filterSpent" onclick="setLogsFilter('spent')">Spent</button>
+                    <button class="logs-filter-btn" id="filterLoan" onclick="setLogsFilter('loan')">Loan</button>
+                    <button class="logs-filter-btn" id="filterIn" onclick="setLogsFilter('in')">Money in</button>
+                    <button class="logs-filter-btn" id="filterTransfer"
+                        onclick="setLogsFilter('transfer')">Transfers</button>
+                    <span class="logs-toolbar-sep" aria-hidden="true"></span>
+                    <button class="logs-filter-btn" id="logsScopeBtn" aria-pressed="false"
+                        onclick="toggleLogsScope()">Both accounts</button>
+                </div>
+                <p class="logs-range-note" id="logsRangeNote"></p>
+            </div>
+
+            <div class="logs-table-wrap" id="logsTableWrap"></div>
+        </div>
+    </div>
+
+    <!-- Backup Modal -->
+    <div class="modal-overlay" id="backupModal">
+        <div class="backup-modal">
+            <h3>Backup &amp; Restore</h3>
+            <p class="backup-subtitle">Export your data to a file to keep it safe, or import a previously saved backup
+                to restore your records.</p>
+            <div class="backup-section">
+                <div class="backup-section-title">Export Data</div>
+                <p class="backup-section-desc">Download all your budget categories, expenses, and settings as a
+                    <strong>.json</strong> file.
+                </p>
+                <button class="btn-export" onclick="exportData()">Download Backup File</button>
+                <div class="backup-meta" id="exportMeta"></div>
+            </div>
+            <div class="backup-section">
+                <div class="backup-section-title">Import / Restore</div>
+                <p class="backup-section-desc">Select a previously exported <strong>.json</strong> backup file to
+                    restore your data.</p>
+                <div class="import-drop-zone" id="importDropZone" ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)"
+                    onclick="document.getElementById('importFileInput').click()">
+                    <span class="drop-icon">↑</span>
+                    <strong>Tap to choose file</strong>
+                    <span class="drop-hint">Only Bank .json backup files</span>
+                    <input type="file" id="importFileInput" accept=".json" onchange="handleFileSelect(event)"
+                        style="display:none;">
+                </div>
+                <div class="import-warning" id="importWarning"></div>
+                <button class="btn-confirm-import" id="btnConfirmImport" onclick="confirmImport()">Restore (Replace
+                    all)</button>
+                <button class="btn-confirm-import" id="btnMergeImport" onclick="mergeImport()"
+                    style="background:linear-gradient(135deg,var(--loan),var(--loan));margin-top:6px;">Merge into
+                    existing</button>
+            </div>
+            <div class="backup-close-row">
+                <button class="btn-modal-cancel" onclick="closeBackup()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Category Budget Modal -->
+    <div class="modal-overlay" id="addCatBudgetModal">
+        <div class="modal" style="max-width:340px;">
+            <h3>＋ Add to Budget</h3>
+            <label data-cur-label="Amount to Add">Amount to Add (₱)</label>
+            <input type="number" id="addCatBudgetAmount" placeholder="0.00" min="0" step="0.01">
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeAddCatBudget()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveAddCatBudget()">Add to Budget</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deduct Category Budget Modal -->
+    <div class="modal-overlay" id="deductCatBudgetModal">
+        <div class="modal" style="max-width:340px;">
+            <h3>－ Deduct from Budget</h3>
+            <label data-cur-label="Amount to Deduct">Amount to Deduct (₱)</label>
+            <input type="number" id="deductCatBudgetAmount" placeholder="0.00" min="0" step="0.01">
+            <p id="deductCatBudgetHint" style="font-size:.72rem;color:var(--text);opacity:.7;margin:8px 0 0;"></p>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeDeductCatBudget()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveDeductCatBudget()">Deduct from Budget</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Expense Modal -->
+    <div class="modal-overlay" id="editExpModal">
+        <div class="modal">
+            <h3>Edit Expense</h3>
+            <label>Note</label>
+            <input type="text" id="editExpNote" maxlength="60">
+            <label data-cur-label="Amount">Amount (₱)</label>
+            <input type="number" id="editExpAmount" min="0" step="0.01">
+            <label>Type</label>
+            <div style="display:flex;gap:8px;margin-bottom:2px;">
+                <button type="button" id="editExpTypeSpent" class="log-type-btn active-spent"
+                    onclick="setEditExpType('spent')">Spent</button>
+                <button type="button" id="editExpTypeLoan" class="log-type-btn"
+                    onclick="setEditExpType('loan')">Loan</button>
+            </div>
+            <label>Date</label>
+            <input type="date" id="editExpDate">
+            <div id="editLoanFields" style="display:none">
+                <label>Which loan is this paying?</label>
+                <select id="editLoanPick"></select>
+            </div>
+            <div id="editGoalFields" style="display:none">
+                <label>Counts toward a savings goal?</label>
+                <select id="editGoalPick"></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-modal-cancel" onclick="closeEditExpModal()">Cancel</button>
+                <button class="btn-modal-save" onclick="saveEditExp()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="storage-alert" id="storageAlert" role="alert">
+        <div class="storage-alert-title"><span>⚠</span><span id="storageAlertTitle">Your changes are not being
+                saved</span></div>
+        <p id="storageAlertMsg"></p>
+        <div class="storage-alert-actions" id="storageAlertActions"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="update-bar" id="updateBar" role="status">
+        <span>A newer version is ready.</span>
+        <button class="update-yes" id="updateNow">Reload</button>
+        <button class="update-no" id="updateLater">Later</button>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+
+</html>

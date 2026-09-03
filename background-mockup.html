@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Theme backgrounds — Budget Tracker</title>
+    <style>
+        /* ============================================================
+           THEME BACKGROUNDS — 6 themes x light + dark, 1920 x 1080 px.
+
+           These are mock-ups to rebuild in Canva, not exports. Every
+           board is drawn at 0.42 scale here; the spec under each one
+           gives the real pixel positions and the exact hex and opacity
+           of every shape, so nothing has to be guessed or eyedropped.
+
+           The colours are not invented for this page: they come from
+           the same formula the tracker uses, so a background built to
+           this spec will sit under its theme without clashing.
+
+           Save each as  Background/<theme>-<light|dark>.png  and load
+           it from Settings -> Look of this tracker -> Background.
+           Keep it faint: the app starts a custom background at 35%.
+           ============================================================ */
+        :root {
+            --paper: #F4F1EC;
+            --ink: #322D29;
+            --muted: #756C64;
+            --line: #E4DED6;
+            --s: 0.42;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0 }
+
+        body {
+            font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            padding: 42px 30px 90px;
+            line-height: 1.5;
+        }
+
+        h1 {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: .4px;
+        }
+
+        .intro {
+            max-width: 760px;
+            margin: 10px 0 34px;
+            font-size: .92rem;
+            color: var(--muted);
+        }
+
+        .intro code, .spec code {
+            font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+            font-size: .86em;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 1px 5px;
+        }
+
+        .boards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 34px;
+        }
+
+        .board { width: calc(1920px * var(--s)) }
+
+        .cap {
+            font-size: .8rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        .cap b { color: var(--ink); font-size: .92rem }
+
+        .file {
+            margin-left: auto;
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: .72rem;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 2px 7px;
+        }
+
+        .bgb {
+            width: calc(1920px * var(--s));
+            height: calc(1080px * var(--s));
+            position: relative;
+            overflow: hidden;
+            border-radius: 3px;
+            box-shadow: 0 1px 2px rgba(50, 45, 41, .10), 0 18px 40px -14px rgba(50, 45, 41, .30);
+        }
+
+        .sh { position: absolute }
+
+        /* fine diagonals — the same rhythm in every theme */
+        .diag {
+            inset: 0;
+            background-image: repeating-linear-gradient(26deg,
+                rgba(255, 255, 255, .05) 0 2px, transparent 2px 90px);
+        }
+
+        /* grain stops a wide flat wash from banding on a big screen */
+        .grain {
+            inset: 0;
+            opacity: .05;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 160px 160px;
+        }
+
+        .vig { inset: 0 }
+
+        .spec {
+            width: 100%;
+            margin-top: 10px;
+            border-collapse: collapse;
+            font-size: .74rem;
+        }
+
+        .spec th {
+            text-align: left;
+            width: 108px;
+            padding: 4px 8px 4px 0;
+            color: var(--muted);
+            font-weight: 600;
+            vertical-align: top;
+        }
+
+        .spec td { padding: 4px 0; border-bottom: 1px solid var(--line) }
+
+        .note {
+            max-width: 760px;
+            margin-top: 44px;
+            padding: 18px 20px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-left: 3px solid #72383D;
+            border-radius: 12px;
+            font-size: .88rem;
+        }
+
+        .note h2 { font-size: 1rem; margin-bottom: 8px; font-family: Georgia, serif }
+        .note li { margin: 5px 0 5px 18px }
+    </style>
+</head>
+
+<body>
+    <h1>Theme backgrounds</h1>
+    <p class="intro">Six themes, each with a light and a dark board at <code>1920 × 1080 px</code>.
+        Rebuild them in Canva from the spec under each board — every shape has its real pixel
+        position, its hex and its opacity, so nothing needs eyedroppering. The colours come from the
+        same formula the tracker uses to build a theme, so a background made to this spec will sit
+        under its theme rather than fight it.</p>
+
+    <div class="boards">
+
+  <figure class="board">
+    <figcaption class="cap"><b>Luxe</b> · Light · 1920 × 1080 px
+      <span class="file">Background/luxe-light.png</span></figcaption>
+    <div class="bgb" style="background:#f5f2f2">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f5f2f2 0%, #f5f2f2 44%, #e7dfe0 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#ece4e5;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#e1d6d7;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#dcc6c8;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f5f2f2</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f5f2f2</code> 0% → <code>#f5f2f2</code> 44% → <code>#e7dfe0</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#ece4e5</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#e1d6d7</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#dcc6c8</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Luxe</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/luxe-dark.png</span></figcaption>
+    <div class="bgb" style="background:#1a1717">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #1a1717 0%, #1a1717 44%, #201d1d 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#302728;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#3c2f30;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#72383D;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#1a1717</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#1a1717</code> 0% → <code>#1a1717</code> 44% → <code>#201d1d</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#302728</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#3c2f30</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#72383D</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+
+  <figure class="board">
+    <figcaption class="cap"><b>Ember</b> · Light · 1920 × 1080 px
+      <span class="file">Background/ember-light.png</span></figcaption>
+    <div class="bgb" style="background:#f5f3f2">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f5f3f2 0%, #f5f3f2 44%, #e7e2df 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#ece7e4;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#e1dad6;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#dccfc6;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f5f3f2</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f5f3f2</code> 0% → <code>#f5f3f2</code> 44% → <code>#e7e2df</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#ece7e4</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#e1dad6</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#dccfc6</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Ember</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/ember-dark.png</span></figcaption>
+    <div class="bgb" style="background:#1a1817">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #1a1817 0%, #1a1817 44%, #201e1d 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#302b27;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#3c342f;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#A6541F;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#1a1817</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#1a1817</code> 0% → <code>#1a1817</code> 44% → <code>#201e1d</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#302b27</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#3c342f</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#A6541F</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+
+  <figure class="board">
+    <figcaption class="cap"><b>Fern</b> · Light · 1920 × 1080 px
+      <span class="file">Background/fern-light.png</span></figcaption>
+    <div class="bgb" style="background:#f2f5f3">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f2f5f3 0%, #f2f5f3 44%, #dfe7e2 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#e4ece7;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#d6e1d9;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#c6dccd;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f2f5f3</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f2f5f3</code> 0% → <code>#f2f5f3</code> 44% → <code>#dfe7e2</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#e4ece7</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#d6e1d9</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#c6dccd</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Fern</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/fern-dark.png</span></figcaption>
+    <div class="bgb" style="background:#171a18">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #171a18 0%, #171a18 44%, #1d201e 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#27302a;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#2f3c33;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#3D6B4C;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#171a18</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#171a18</code> 0% → <code>#171a18</code> 44% → <code>#1d201e</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#27302a</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#2f3c33</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#3D6B4C</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+
+  <figure class="board">
+    <figcaption class="cap"><b>Harbour</b> · Light · 1920 × 1080 px
+      <span class="file">Background/harbour-light.png</span></figcaption>
+    <div class="bgb" style="background:#f2f4f5">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f2f4f5 0%, #f2f4f5 44%, #dfe5e7 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#e4eaec;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#d6dee1;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#c6d6dc;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f2f4f5</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f2f4f5</code> 0% → <code>#f2f4f5</code> 44% → <code>#dfe5e7</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#e4eaec</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#d6dee1</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#c6d6dc</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Harbour</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/harbour-dark.png</span></figcaption>
+    <div class="bgb" style="background:#17191a">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #17191a 0%, #17191a 44%, #1d1f20 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#272d30;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#2f393c;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#2C5F73;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#17191a</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#17191a</code> 0% → <code>#17191a</code> 44% → <code>#1d1f20</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#272d30</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#2f393c</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#2C5F73</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+
+  <figure class="board">
+    <figcaption class="cap"><b>Indigo</b> · Light · 1920 × 1080 px
+      <span class="file">Background/indigo-light.png</span></figcaption>
+    <div class="bgb" style="background:#f2f2f5">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f2f2f5 0%, #f2f2f5 44%, #dfe0e7 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#e4e5ec;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#d6d7e1;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#c6c9dc;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f2f2f5</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f2f2f5</code> 0% → <code>#f2f2f5</code> 44% → <code>#dfe0e7</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#e4e5ec</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#d6d7e1</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#c6c9dc</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Indigo</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/indigo-dark.png</span></figcaption>
+    <div class="bgb" style="background:#17171a">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #17171a 0%, #17171a 44%, #1d1d20 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#272830;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#2f313c;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#404A85;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#17171a</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#17171a</code> 0% → <code>#17171a</code> 44% → <code>#1d1d20</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#272830</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#2f313c</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#404A85</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+
+  <figure class="board">
+    <figcaption class="cap"><b>Plum</b> · Light · 1920 × 1080 px
+      <span class="file">Background/plum-light.png</span></figcaption>
+    <div class="bgb" style="background:#f4f2f5">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #f4f2f5 0%, #f4f2f5 44%, #e5dfe7 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#eae4ec;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#ded6e1;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#d7c6dc;opacity:.30"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(50,45,41,.12) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#f4f2f5</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#f4f2f5</code> 0% → <code>#f4f2f5</code> 44% → <code>#e5dfe7</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#eae4ec</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#ded6e1</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#d7c6dc</code> · opacity 30%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#000000</code> · opacity 4%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 4%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#322D29 12%</code></td></tr>
+    </table>
+  </figure>
+  <figure class="board">
+    <figcaption class="cap"><b>Plum</b> · Dark · 1920 × 1080 px
+      <span class="file">Background/plum-dark.png</span></figcaption>
+    <div class="bgb" style="background:#19171a">
+      <div class="sh" style="inset:0;background:linear-gradient(168deg, #19171a 0%, #19171a 44%, #201d20 100%)"></div>
+      <div class="sh" style="left:-14%;top:-22%;width:86%;height:126%;border-radius:50%;
+        background:#2e2730;opacity:.55;filter:blur(2px)"></div>
+      <div class="sh" style="right:-20%;top:26%;width:78%;height:120%;border-radius:50%;
+        background:#392f3c;opacity:.42"></div>
+      <div class="sh" style="left:8%;bottom:-38%;width:64%;height:82%;border-radius:50%;
+        background:#5F3A6B;opacity:.18"></div>
+      <div class="sh diag"></div>
+      <div class="sh grain"></div>
+      <div class="sh vig" style="background:radial-gradient(ellipse 95% 80% at 50% 45%, transparent 58%,
+        rgba(0,0,0,.42) 100%)"></div>
+    </div>
+    <table class="spec">
+      <tr><th>Canvas</th><td>1920 × 1080 px · fill <code>#19171a</code></td></tr>
+      <tr><th>Base gradient</th><td>linear 168° · <code>#19171a</code> 0% → <code>#19171a</code> 44% → <code>#201d20</code> 100%</td></tr>
+      <tr><th>Shape 1</th><td>ellipse · x −269 y −238 · w 1651 h 1361 · fill <code>#2e2730</code> · opacity 55%</td></tr>
+      <tr><th>Shape 2</th><td>ellipse · x 806 y 281 · w 1498 h 1296 · fill <code>#392f3c</code> · opacity 42%</td></tr>
+      <tr><th>Shape 3</th><td>ellipse · x 154 y 828 · w 1229 h 886 · fill <code>#5F3A6B</code> · opacity 18%</td></tr>
+      <tr><th>Diagonals</th><td>2 px lines at 26°, 90 px apart · <code>#FFFFFF</code> · opacity 3%</td></tr>
+      <tr><th>Grain</th><td>noise texture over everything · opacity 6%</td></tr>
+      <tr><th>Vignette</th><td>radial, transparent to 58% then <code>#000000 42%</code></td></tr>
+    </table>
+  </figure>
+    </div>
+
+    <div class="note">
+        <h2>Using these</h2>
+        <ul>
+            <li>Export each board from Canva as <code>PNG</code> at <code>1920 × 1080</code>.</li>
+            <li>In the tracker: <b>Settings → Look of this tracker → Background → Choose a picture</b>.</li>
+            <li>The picture is stored on the device separately from your records, shrunk to 1600 px
+                and saved as a JPEG, so a large photo can never stop your budget saving.</li>
+            <li>A custom background starts at <b>35%</b> strength on purpose — it is there to give the
+                page a mood, not to compete with the figures. The slider takes it up or down.</li>
+            <li>Light and dark are separate boards: set whichever matches the mode you use most, or
+                keep the built-in artwork and just change the colour theme.</li>
+        </ul>
+    </div>
+</body>
+
+</html>
