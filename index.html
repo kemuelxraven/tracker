@@ -26,7 +26,8 @@
     <!-- Installable / offline. Everything below is cached by sw.js after the first visit. -->
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="./icon.svg">
+    <!-- iOS ignores an SVG apple-touch-icon and falls back to a screenshot -->
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
