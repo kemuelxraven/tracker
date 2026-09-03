@@ -1,10 +1,16 @@
 {
+  "id": "./",
   "name": "Budget Tracker",
   "short_name": "Tracker",
   "description": "A private, offline-first budget and expense tracker. All data stays on this device.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "portrait-primary",
   "background_color": "#EFE9E1",
   "theme_color": "#322D29",
@@ -22,7 +28,7 @@
       "purpose": "any"
     },
     {
-      "src": "./icon-512.png",
+      "src": "./icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
