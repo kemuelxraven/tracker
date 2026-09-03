@@ -402,6 +402,20 @@
                     started. Your records, categories, accounts and PIN are not touched.</p>
             </div>
 
+            <div class="settings-group">
+                <div class="settings-group-title">Works offline</div>
+                <div id="offlineStatus"></div>
+                <div class="settings-btn-row" style="margin-top:12px">
+                    <button type="button" class="storage-btn" onclick="renderOfflineStatus()">Check again</button>
+                    <button type="button" class="storage-btn ghost" onclick="refreshOfflineCopy()">Save for offline
+                        now</button>
+                </div>
+                <p class="settings-hint">The tracker keeps its own copy of itself on this device so it opens with no
+                    signal. It needs <strong>one full visit with a connection</strong> first, and the address must
+                    start with https — a GitHub Pages link does. Clearing your browsing data removes the copy, so
+                    open it online once afterwards.</p>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn-modal-cancel" onclick="closeSettings()">Cancel</button>
                 <button class="btn-modal-save" onclick="saveSettings()">Save settings</button>
@@ -917,6 +931,11 @@
                 <ul>
                     <li>A <span class="manual-key">Offline</span> badge appears in the top-right when there is no connection, to say the
                         tracker is still working normally.</li>
+                    <li><strong>Not sure it is ready?</strong> <span class="manual-key">Data ▾</span> →
+                        <span class="manual-key">Settings</span> → <em>Works offline</em> tells you in plain words
+                        whether the tracker has saved itself to this device, and how many files it has. If it says
+                        it is not ready, tap <span class="manual-key">Save for offline now</span> while you still
+                        have a connection.</li>
                     <li>Everything you type is saved to your own device instantly. It does not travel over the
                         internet and it is not stored on any server.</li>
                     <li>Nobody else — not even the person who made this tracker — can see your budget.</li>
