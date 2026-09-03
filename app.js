@@ -4496,13 +4496,28 @@ async function renderOfflineStatus() {
         why = s.cached + ' files are saved on this device. Turn off your data and reload to try it.';
     }
 
+    /* An installed copy is the most reliable way to open with no signal,
+       especially on iPhone where a plain browser tab often refuses. */
+    let install = '';
+    if (isInstalled()) {
+        install = '<p class="settings-hint offline-installed">✓ Running as an installed app — the most reliable way to open it offline.</p>';
+    } else if (deferredInstall) {
+        install = '<div class="settings-btn-row" style="margin-top:10px">' +
+            '<button type="button" class="storage-btn" onclick="installApp()">Add to home screen</button></div>' +
+            '<p class="settings-hint">Installing it opens the tracker like an app, and makes opening it offline far more dependable.</p>';
+    } else if (isIOS()) {
+        install = '<p class="settings-hint"><strong>On iPhone and iPad</strong>, a plain Safari tab is unreliable with no signal. ' +
+            'Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open the tracker from that icon instead.</p>';
+    }
+
     box.innerHTML =
         `<p class="offline-state${ready ? ' ok' : ''}"><strong>${vizEsc(head)}</strong></p>` +
-        `<p class="settings-hint">${why}</p>` +
+        `<p class="settings-hint">${why}</p>` + install +
         `<p class="settings-hint offline-detail">` +
         `Worker: ${s.registered ? vizEsc(s.state || 'yes') : 'none'} · ` +
         `In charge of this page: ${s.controlled ? 'yes' : 'no'} · ` +
-        `Files saved: ${s.cached == null ? '0' : s.cached}` +
+        `Files saved: ${s.cached == null ? '0' : s.cached} · ` +
+        `Installed: ${isInstalled() ? 'yes' : 'no'}` +
         (s.cacheName ? ' · ' + vizEsc(s.cacheName) : '') +
         `</p>`;
 }
@@ -4520,4 +4535,42 @@ async function refreshOfflineCopy() {
         }
     } catch (e) { showToast('Could not save for offline') }
     setTimeout(renderOfflineStatus, 1200);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   INSTALLING TO THE HOME SCREEN
+
+   Android fires beforeinstallprompt when the page qualifies; holding
+   on to it lets the tracker offer the install itself rather than
+   leaving people to find "Add to Home screen" in the browser menu.
+   iOS never fires it, so there the Settings panel says how to do it
+   by hand instead.
+   ════════════════════════════════════════════════════════════════ */
+let deferredInstall = null;
+function isInstalled() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        navigator.standalone === true;
+}
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+window.addEventListener('beforeinstallprompt', ev => {
+    /* stop the browser's own banner so the offer appears where the rest
+       of the offline settings are */
+    ev.preventDefault();
+    deferredInstall = ev;
+    renderOfflineStatus();
+});
+window.addEventListener('appinstalled', () => {
+    deferredInstall = null;
+    renderOfflineStatus();
+    showToast('Added to your home screen ✓');
+});
+async function installApp() {
+    if (!deferredInstall) { showToast('Use your browser menu to add it'); return }
+    deferredInstall.prompt();
+    try { await deferredInstall.userChoice } catch (e) { }
+    deferredInstall = null;
+    renderOfflineStatus();
 }
