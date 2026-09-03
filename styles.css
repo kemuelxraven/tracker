@@ -6092,3 +6092,7 @@ body.cat-reordering .cat-card:not(.cat-dragging) {
     font-size: .68rem;
     opacity: .8;
 }
+
+.offline-installed {
+    color: var(--pos);
+}
