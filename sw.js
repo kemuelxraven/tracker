@@ -10,7 +10,7 @@
    deleted on activate.
    ───────────────────────────────────────────────────────────── */
 
-const CACHE = 'tracker-v20';
+const CACHE = 'tracker-v21';
 
 /* Everything the app shell is made of. Paths are relative so the
    worker also works from a project subfolder (github.io/<repo>/). */
@@ -24,6 +24,7 @@ const PRECACHE = [
     './apple-touch-icon.png',
     './icon-192.png',
     './icon-512.png',
+    './icon-maskable-512.png',
     /* the default theme's backdrop, so a first offline open still has it.
        The other themes' boards are a few megabytes together, so they are
        left to cache themselves the first time each one is shown. */
