@@ -6074,3 +6074,21 @@ body.cat-reordering .cat-card:not(.cat-dragging) {
 .theme-swatch-art .theme-swatch-dot {
     box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .75), 0 1px 3px rgba(0, 0, 0, .25);
 }
+
+/* ── offline readiness readout ── */
+.offline-state {
+    font-size: .88rem;
+    color: var(--neg);
+    margin-bottom: 4px;
+}
+
+.offline-state.ok {
+    color: var(--pos);
+}
+
+.offline-detail {
+    margin-top: 6px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: .68rem;
+    opacity: .8;
+}
