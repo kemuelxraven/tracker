@@ -544,7 +544,7 @@ function openSettings() {
     document.getElementById('setLabelBank').value = accountLabel('bank');
     document.getElementById('setLabelCash').value = accountLabel('cash');
     document.getElementById('setCycleStart').value = cycleStart();
-    renderThemePicker(); renderAppearanceState();
+    renderThemePicker(); renderAppearanceState(); renderOfflineStatus();
     document.getElementById('setAppName').value = st.appName;
     document.getElementById('setAppTagline').value = st.appTagline;
     renderLockSettings();
@@ -2075,6 +2075,7 @@ window.addEventListener('online', showOfflineState);
 window.addEventListener('offline', showOfflineState);
 showOfflineState();
 
+let swError = null;
 (function registerOfflineWorker() {
     /* Service workers only exist over http(s); opening the file
        directly from disk still works, just without precaching. */
@@ -2114,7 +2115,12 @@ showOfflineState();
                     if (sw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBar(sw);
                 });
             });
-        }).catch(() => { /* no offline cache — the app still runs */ });
+        }).catch(err => {
+            /* Swallowing this made an offline failure impossible to explain
+               on a phone, where there is no console to look at. It is kept
+               and shown in Settings instead. */
+            swError = (err && err.message) ? err.message : String(err);
+        });
     });
 })();
 
@@ -4425,4 +4431,93 @@ function resetCustomisation() {
     applySettings(); applyAppearance(); syncAccountUI(); render();
     renderThemePicker(); renderAppearanceState();
     showToast('Name and look reset ✓');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   OFFLINE STATUS
+
+   On a phone there is no console to look at, so "it did not open
+   offline" is impossible to explain. This reads the real state of
+   the service worker and its cache and says so in plain words,
+   right inside Settings.
+   ════════════════════════════════════════════════════════════════ */
+async function readOfflineStatus() {
+    const out = { supported: false, secure: window.isSecureContext, protocol: location.protocol, error: swError };
+    if (!('serviceWorker' in navigator)) return out;
+    out.supported = true;
+    try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        out.registered = !!reg;
+        if (reg) {
+            out.state = reg.active ? 'active' : reg.installing ? 'installing' : reg.waiting ? 'waiting' : 'unknown';
+            out.scope = reg.scope;
+        }
+        out.controlled = !!navigator.serviceWorker.controller;
+        if (window.caches) {
+            const names = await caches.keys();
+            out.cacheNames = names;
+            const mine = names.filter(n => n.indexOf('tracker-') === 0).pop();
+            if (mine) {
+                out.cacheName = mine;
+                out.cached = (await (await caches.open(mine)).keys()).length;
+            }
+        }
+    } catch (e) { out.error = out.error || String(e) }
+    return out;
+}
+async function renderOfflineStatus() {
+    const box = document.getElementById('offlineStatus'); if (!box) return;
+    box.textContent = 'Checking…';
+    const s = await readOfflineStatus();
+
+    /* ready means: a worker is in charge AND the shell is in the cache */
+    const ready = s.supported && s.registered && s.state === 'active' && s.controlled && s.cached > 0;
+    let head, why;
+    if (!s.supported) {
+        head = 'Not available in this browser';
+        why = 'This browser does not support offline pages. The tracker still works normally while you have a connection.';
+    } else if (s.protocol === 'file:') {
+        head = 'Not available when opened from a file';
+        why = 'You have opened the tracker from a file on the device rather than from a web address. Offline only works from an http:// or https:// address — open your GitHub Pages link instead.';
+    } else if (!s.secure) {
+        head = 'Not available on this address';
+        why = 'Offline needs a secure address. GitHub Pages is https, so it will work there.';
+    } else if (s.error) {
+        head = 'Could not be set up';
+        why = 'The tracker tried to save itself for offline use and was refused: ' + vizEsc(s.error);
+    } else if (!s.registered) {
+        head = 'Not saved yet';
+        why = 'Reload this page once while you have a connection, then check again.';
+    } else if (!ready) {
+        head = 'Almost ready';
+        why = 'The offline copy is still being set up. Reload once more with a connection, then check again.';
+    } else {
+        head = 'Ready — this tracker opens without internet';
+        why = s.cached + ' files are saved on this device. Turn off your data and reload to try it.';
+    }
+
+    box.innerHTML =
+        `<p class="offline-state${ready ? ' ok' : ''}"><strong>${vizEsc(head)}</strong></p>` +
+        `<p class="settings-hint">${why}</p>` +
+        `<p class="settings-hint offline-detail">` +
+        `Worker: ${s.registered ? vizEsc(s.state || 'yes') : 'none'} · ` +
+        `In charge of this page: ${s.controlled ? 'yes' : 'no'} · ` +
+        `Files saved: ${s.cached == null ? '0' : s.cached}` +
+        (s.cacheName ? ' · ' + vizEsc(s.cacheName) : '') +
+        `</p>`;
+}
+/* force a fresh check for the shipped files */
+async function refreshOfflineCopy() {
+    if (!('serviceWorker' in navigator)) { showToast('Not supported in this browser'); return }
+    try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) {
+            await navigator.serviceWorker.register('./sw.js');
+            showToast('Saving for offline…');
+        } else {
+            await reg.update();
+            showToast('Offline copy refreshed ✓');
+        }
+    } catch (e) { showToast('Could not save for offline') }
+    setTimeout(renderOfflineStatus, 1200);
 }
