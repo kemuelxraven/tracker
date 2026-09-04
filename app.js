@@ -2086,7 +2086,7 @@ showOfflineState();
 /* Bump together with CACHE in sw.js. Shown in Settings so the version a
    device is actually running can be read off the screen — without it,
    "it still behaves like the old one" is impossible to check. */
-const APP_VERSION = 'v24';
+const APP_VERSION = 'v25';
 let swError = null;
 (function registerOfflineWorker() {
     /* Service workers only exist over http(s); opening the file
@@ -2677,9 +2677,12 @@ function renderExportHint() {
     const el = document.getElementById('exportHint'); if (!el) return;
     const rows = exportRows();
     const accounts = exportAccountKeys().map(accountLabel).join(' and ');
+    const how = exportFormat() === 'csv'
+        ? 'CSV is plain text: it opens anywhere and imports into anything, but carries no formatting.'
+        : 'The Excel file comes formatted — headings, currency, banded rows, a totals line and filter buttons. It opens in Excel, Numbers and Google Sheets.';
     el.textContent = rows.length
         ? `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'} · ${exportRangeLabel()} · ${accounts}. ` +
-        'CSV opens in Excel, Numbers or Google Sheets. Print gives you a PDF through "Save as PDF".'
+        how + ' Print gives you a PDF through "Save as PDF".'
         : `Nothing to export for ${exportRangeLabel()} in ${accounts}.`;
 }
 
@@ -2781,7 +2784,104 @@ function exportBudgets() {
     return out;
 }
 
-/* ── CSV plumbing ── */
+/* ── ONE TABLE DEFINITION, TWO FILE FORMATS ──
+   Each report is described once — its columns, how each column should be
+   read and how it should be shown — and both writers below work from that
+   description. A column added here appears in the spreadsheet and in the
+   CSV without either writer being touched.
+
+   type decides the formatting: 'money' is right-aligned and carries the
+   currency symbol, 'pct' shows as 45%, everything else is plain text.
+   total: true asks for that column to be summed on the totals row. */
+function exportTable(kind) {
+    if (kind === 'transactions') {
+        const rows = exportRows();
+        return {
+            kind, sheet: 'Transactions', title: 'Transactions',
+            countLabel: 'Entries', rows,
+            note: 'Money out covers spending, loan payments, savings set aside and transfers sent.',
+            cols: [
+                { label: 'Date', w: 12, get: r => r.date },
+                { label: 'Month', w: 20, get: r => r.period ? periodLabel(r.period) : '' },
+                { label: 'Account', w: 12, get: r => r.account },
+                { label: 'Kind', w: 13, get: r => r.kind },
+                { label: 'Category', w: 20, get: r => r.category },
+                { label: 'Type', w: 17, get: r => r.type },
+                { label: 'Note', w: 36, get: r => r.note },
+                { label: 'Money in', w: 14, type: 'money', total: true, get: r => r.sign > 0 ? r.amount : null },
+                { label: 'Money out', w: 14, type: 'money', total: true, get: r => r.sign < 0 ? r.amount : null }
+            ]
+        };
+    }
+    if (kind === 'summary') {
+        const rows = exportSummary();
+        return {
+            kind, sheet: 'Monthly summary', title: 'Monthly summary',
+            countLabel: 'Months', rows,
+            note: 'Net = money in + transfers in − transfers out − set aside − spent − loan payments.',
+            cols: [
+                { label: 'Month', w: 22, get: r => periodLabel(r.period) },
+                { label: 'Account', w: 12, get: r => r.account },
+                { label: 'Money in', w: 14, type: 'money', total: true, get: r => r.moneyIn },
+                { label: 'Transfers in', w: 14, type: 'money', total: true, get: r => r.transfersIn },
+                { label: 'Transfers out', w: 14, type: 'money', total: true, get: r => r.transfersOut },
+                { label: 'Set aside', w: 13, type: 'money', total: true, get: r => r.setAside },
+                { label: 'Spent', w: 14, type: 'money', total: true, get: r => r.spent },
+                { label: 'Loan payments', w: 15, type: 'money', total: true, get: r => r.loan },
+                { label: 'Total out', w: 14, type: 'money', total: true, get: r => r.totalOut },
+                { label: 'Budgeted', w: 14, type: 'money', total: true, get: r => r.budget },
+                { label: 'Net', w: 14, type: 'money', total: true, get: r => r.net },
+                { label: 'Month key', w: 11, get: r => r.period }
+            ]
+        };
+    }
+    const rows = exportBudgets();
+    return {
+        kind, sheet: 'Category budgets', title: 'Category budgets',
+        countLabel: 'Rows', rows,
+        note: 'Rows over budget are shaded red. A blank Used % means no allowance was set that month.',
+        /* the whole row goes red when the category was overspent, which is
+           the one thing a reader scans this sheet for */
+        warn: r => r.left < -0.005,
+        cols: [
+            { label: 'Month', w: 22, get: r => periodLabel(r.period) },
+            { label: 'Account', w: 12, get: r => r.account },
+            { label: 'Category', w: 24, get: r => r.name },
+            { label: 'Budget', w: 14, type: 'money', total: true, get: r => r.budget },
+            { label: 'Spent', w: 14, type: 'money', total: true, get: r => r.spent },
+            { label: 'Left', w: 14, type: 'money', total: true, get: r => r.left },
+            { label: 'Used %', w: 10, type: 'pct', get: r => r.pct },
+            { label: 'Status', w: 14, get: r => r.left < -0.005 ? 'Over budget' : 'Within budget' },
+            { label: 'Month key', w: 11, get: r => r.period }
+        ]
+    };
+}
+
+/* The block that heads every export, so a file that arrives by email
+   explains itself without the sender having to. */
+function exportHeadLines(table) {
+    const now = new Date();
+    return [
+        ['Period', exportRangeLabel()],
+        ['Accounts', exportAccountKeys().map(accountLabel).join(' & ')],
+        ['Currency', cur()],
+        ['Generated', now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) +
+            ' at ' + now.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })],
+        [table.countLabel, table.rows.length]
+    ];
+}
+function exportTotals(table) {
+    if (!table.cols.some(c => c.total)) return null;
+    return table.cols.map((c, i) => {
+        if (c.total) return table.rows.reduce((s, r) => s + (Number(c.get(r)) || 0), 0);
+        return i === 0 ? 'TOTAL' : null;
+    });
+}
+
+/* ── CSV ──
+   Plain text can carry no formatting, so what makes it readable is
+   structure: a title, the same header block as the spreadsheet, one blank
+   line, then the table, then the totals. */
 function csvCell(v) {
     const s = v == null ? '' : String(v);
     if (/^-?\d+(\.\d+)?$/.test(s)) return s;      /* a plain number, left bare for the spreadsheet */
@@ -2791,17 +2891,242 @@ function csvCell(v) {
     return '"' + safe.replace(/"/g, '""') + '"';
 }
 function csvNum(n) { return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2) }
-function toCsv(header, rows) {
+function csvLine(arr) { return arr.map(csvCell).join(',') }
+function toCsv(table) {
+    const lines = [];
+    lines.push(csvLine([`${settings().appName || 'Tracker'} — ${table.title}`]));
+    exportHeadLines(table).forEach(p => lines.push(csvLine(p)));
+    lines.push('');
+    lines.push(csvLine(table.cols.map(c => c.type === 'money' ? `${c.label} (${cur()})` : c.label)));
+    table.rows.forEach(r => lines.push(csvLine(table.cols.map(c => {
+        const v = c.get(r);
+        if (c.type === 'money') return v == null ? '' : csvNum(v);
+        if (c.type === 'pct') return v == null ? '' : v + '%';
+        return v;
+    }))));
+    const totals = exportTotals(table);
+    if (totals) {
+        lines.push('');
+        lines.push(csvLine(totals.map((v, i) => table.cols[i].total ? csvNum(v) : v)));
+    }
+    if (table.note) { lines.push(''); lines.push(csvLine([table.note])) }
     /* the BOM is what makes Excel read ₱ and accented notes correctly */
-    return '\ufeff' + [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+    return '﻿' + lines.join('\r\n') + '\r\n';
 }
-function downloadFile(name, text, mime) {
-    const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+
+/* ── XLSX ──
+   A .xlsx is a ZIP of XML parts. Writing the six parts Excel insists on is
+   a few dozen lines, and it buys real formatting — bold headers, banded
+   rows, a currency format, a frozen header and filter buttons — which is
+   the whole point of this over CSV. No library, so it still works offline. */
+function xEsc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+        /* control characters are not legal in XML and would break the file */
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+function xlCol(i) { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26) } return s }
+
+let CRC_TABLE = null;
+function crc32(buf) {
+    if (!CRC_TABLE) {
+        CRC_TABLE = new Int32Array(256);
+        for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            CRC_TABLE[n] = c;
+        }
+    }
+    let c = -1;
+    for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ -1) >>> 0;
+}
+/* Entries are stored, not deflated — there is no compressor in the browser
+   that works synchronously, and a report of a few hundred rows is small
+   enough that it does not matter. */
+function zipStore(files, mime) {
+    const enc = new TextEncoder(), parts = [], central = [];
+    const d = new Date();
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    let offset = 0;
+    files.forEach(f => {
+        const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+        const lh = new DataView(new ArrayBuffer(30));
+        lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0, true);
+        lh.setUint16(8, 0, true); lh.setUint16(10, time, true); lh.setUint16(12, date, true);
+        lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+        lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+        parts.push(new Uint8Array(lh.buffer), name, data);
+
+        const ch = new DataView(new ArrayBuffer(46));
+        ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+        ch.setUint16(8, 0, true); ch.setUint16(10, 0, true); ch.setUint16(12, time, true);
+        ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+        ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+        ch.setUint16(28, name.length, true); ch.setUint16(30, 0, true); ch.setUint16(32, 0, true);
+        ch.setUint16(34, 0, true); ch.setUint16(36, 0, true); ch.setUint32(38, 0, true);
+        ch.setUint32(42, offset, true);
+        central.push(new Uint8Array(ch.buffer), name);
+        offset += 30 + name.length + data.length;
+    });
+    const cdSize = central.reduce((s, p) => s + p.length, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(4, 0, true); end.setUint16(6, 0, true);
+    end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true); end.setUint16(20, 0, true);
+    return new Blob(parts.concat(central, [new Uint8Array(end.buffer)]), { type: mime });
+}
+
+/* Style slots, referenced by number from every cell below. */
+const XS = {
+    base: 0, title: 1, muted: 2, key: 3, val: 4, head: 5,
+    text: 6, textAlt: 7, money: 8, moneyAlt: 9, pct: 10, pctAlt: 11,
+    totalText: 12, totalMoney: 13, warnText: 14, warnMoney: 15, warnPct: 16
+};
+function xlsxStyles() {
+    const money = `"${cur()}"#,##0.00;[Red]-"${cur()}"#,##0.00`;
+    const thin = c => `<${c} style="thin"><color rgb="FFDCE1E6"/></${c}>`;
+    const align = (h, extra) => `<alignment horizontal="${h}" vertical="center"${extra || ''}/>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="${xEsc(money)}"/><numFmt numFmtId="165" formatCode="${xEsc('0"%"')}"/></numFmts>
+<fonts count="6">
+<font><sz val="11"/><color theme="1"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color theme="1"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+<font><b/><sz val="16"/><color rgb="FF1F2A37"/><name val="Calibri"/></font>
+<font><sz val="10"/><color rgb="FF6B7280"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><color rgb="FFB42318"/><name val="Calibri"/></font>
+</fonts>
+<fills count="5">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF2F4858"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF4F6F8"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFDECEA"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="3">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border>${thin('left')}${thin('right')}${thin('top')}${thin('bottom')}<diagonal/></border>
+<border><left/><right/><top style="medium"><color rgb="FF2F4858"/></top><bottom/><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="17">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('center', ' wrapText="1"')}</xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1">${align('right')}</xf>
+<xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('right')}</xf>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1">${align('center')}</xf>
+<xf numFmtId="165" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('center')}</xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="164" fontId="1" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1">${align('right')}</xf>
+<xf numFmtId="0" fontId="5" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('left')}</xf>
+<xf numFmtId="164" fontId="5" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('right')}</xf>
+<xf numFmtId="165" fontId="5" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align('center')}</xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+}
+function xlCell(ref, style, value, numeric) {
+    if (value == null || value === '') return `<c r="${ref}" s="${style}"/>`;
+    if (numeric) return `<c r="${ref}" s="${style}"><v>${Math.round((Number(value) || 0) * 100) / 100}</v></c>`;
+    return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xEsc(value)}</t></is></c>`;
+}
+function xlsxSheet(table) {
+    const cols = table.cols, last = xlCol(cols.length - 1);
+    const head = exportHeadLines(table);
+    const rows = [];
+    let n = 0;
+    const push = (cells, attrs) => { n++; rows.push(`<row r="${n}"${attrs || ''}>${cells.map(c => c(n)).join('')}</row>`) };
+
+    push([r => xlCell('A' + r, XS.title, `${settings().appName || 'Tracker'} — ${table.title}`)], ' ht="24" customHeight="1"');
+    push([r => xlCell('A' + r, XS.muted, table.note || '')], ' ht="15"');
+    push([]);
+    head.forEach(pair => push([
+        r => xlCell('A' + r, XS.key, pair[0]),
+        r => xlCell('B' + r, XS.val, pair[1], typeof pair[1] === 'number')
+    ]));
+    push([]);
+
+    const headRow = n + 1;
+    push(cols.map((c, i) => r => xlCell(xlCol(i) + r, XS.head, c.label)), ' ht="30" customHeight="1"');
+
+    const firstData = n + 1;
+    table.rows.forEach((row, ri) => {
+        const alt = ri % 2 === 1, warn = table.warn && table.warn(row);
+        push(cols.map((c, i) => r => {
+            const v = c.get(row);
+            const ref = xlCol(i) + r;
+            if (c.type === 'money') return xlCell(ref, warn ? XS.warnMoney : alt ? XS.moneyAlt : XS.money, v, true);
+            if (c.type === 'pct') return xlCell(ref, warn ? XS.warnPct : alt ? XS.pctAlt : XS.pct, v, true);
+            return xlCell(ref, warn ? XS.warnText : alt ? XS.textAlt : XS.text, v);
+        }));
+    });
+    const lastData = n;
+
+    const totals = exportTotals(table);
+    if (totals) push(cols.map((c, i) => r => c.total
+        ? xlCell(xlCol(i) + r, XS.totalMoney, totals[i], true)
+        : xlCell(xlCol(i) + r, XS.totalText, totals[i])));
+
+    const filter = lastData >= firstData
+        ? `<autoFilter ref="A${headRow}:${last}${lastData}"/>` : '';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<dimension ref="A1:${last}${n}"/>
+<sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"><pane ySplit="${headRow}" topLeftCell="A${headRow + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${headRow + 1}" sqref="A${headRow + 1}"/></sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>${cols.map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.w || 14}" customWidth="1"/>`).join('')}</cols>
+<sheetData>${rows.join('')}</sheetData>
+${filter}
+<mergeCells count="2"><mergeCell ref="A1:${last}1"/><mergeCell ref="A2:${last}2"/></mergeCells>
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>
+</worksheet>`;
+}
+function toXlsx(table) {
+    const name = xEsc(table.sheet).slice(0, 31);
+    return zipStore([
+        {
+            name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`
+        },
+        {
+            name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`
+        },
+        {
+            name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets></workbook>`
+        },
+        {
+            name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
+        },
+        { name: 'xl/styles.xml', data: xlsxStyles() },
+        { name: 'xl/worksheets/sheet1.xml', data: xlsxSheet(table) }
+    ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
+/* ── saving ── */
+function downloadBlob(name, blob) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function downloadFile(name, text, mime) {
+    downloadBlob(name, new Blob([text], { type: mime + ';charset=utf-8' }));
 }
 function exportSlug() {
     return (settings().appName || 'tracker').toLowerCase()
@@ -2810,45 +3135,25 @@ function exportSlug() {
 function exportFileName(what, ext) {
     return `${exportSlug()}-${what}-${exportMonthKey() || 'all-months'}.${ext}`;
 }
-
-function exportTransactionsCsv() {
-    const rows = exportRows();
-    if (!rows.length) { showToast('Nothing to export for that range'); return }
-    const body = rows.map(r => [
-        r.date, r.period, r.account, r.kind, r.category, r.type, r.note,
-        csvNum(r.amount), csvNum(r.amount * r.sign), cur()
-    ]);
-    downloadFile(exportFileName('transactions', 'csv'), toCsv(
-        ['Date', 'Month', 'Account', 'Kind', 'Category', 'Type', 'Note', 'Amount', 'Signed amount', 'Currency'],
-        body), 'text/csv');
-    showToast(`${rows.length} entries exported ✓`);
+function exportFormat() {
+    const el = document.getElementById('exportFormat');
+    return el && el.value === 'csv' ? 'csv' : 'xlsx';
 }
-function exportSummaryCsv() {
-    const rows = exportSummary();
-    if (!rows.length) { showToast('Nothing to export for that range'); return }
-    const body = rows.map(r => [
-        r.period, periodLabel(r.period), r.account, csvNum(r.moneyIn), csvNum(r.transfersIn),
-        csvNum(r.transfersOut), csvNum(r.setAside), csvNum(r.spent), csvNum(r.loan), csvNum(r.totalOut),
-        csvNum(r.budget), csvNum(r.net), cur()
-    ]);
-    downloadFile(exportFileName('monthly-summary', 'csv'), toCsv(
-        ['Month', 'Period', 'Account', 'Money in', 'Transfers in', 'Transfers out', 'Set aside',
-            'Spent', 'Loan payments', 'Total out', 'Budgeted', 'Net', 'Currency'],
-        body), 'text/csv');
-    showToast('Monthly summary exported ✓');
+/* The three buttons all land here; the picker beside them decides which
+   writer runs, so neither the buttons nor the reports know about formats. */
+function exportReport(kind, slug, empty) {
+    const table = exportTable(kind);
+    if (!table.rows.length) { showToast(empty); return }
+    if (exportFormat() === 'csv') {
+        downloadFile(exportFileName(slug, 'csv'), toCsv(table), 'text/csv');
+    } else {
+        downloadBlob(exportFileName(slug, 'xlsx'), toXlsx(table));
+    }
+    showToast(`${table.title} exported ✓`);
 }
-function exportBudgetsCsv() {
-    const rows = exportBudgets();
-    if (!rows.length) { showToast('No categories to export for that range'); return }
-    const body = rows.map(r => [
-        r.period, periodLabel(r.period), r.account, r.name, csvNum(r.budget), csvNum(r.spent),
-        csvNum(r.left), r.pct == null ? '' : r.pct, r.left < -0.005 ? 'Over budget' : '', cur()
-    ]);
-    downloadFile(exportFileName('category-budgets', 'csv'), toCsv(
-        ['Month', 'Period', 'Account', 'Category', 'Budget', 'Spent', 'Left', 'Used %', 'Status', 'Currency'],
-        body), 'text/csv');
-    showToast('Category budgets exported ✓');
-}
+function exportTransactionsCsv() { exportReport('transactions', 'transactions', 'Nothing to export for that range') }
+function exportSummaryCsv() { exportReport('summary', 'monthly-summary', 'Nothing to export for that range') }
+function exportBudgetsCsv() { exportReport('budgets', 'category-budgets', 'No categories to export for that range') }
 
 /* ── the printed sheet ── */
 function prMoney(n) { return fmt(n) }
