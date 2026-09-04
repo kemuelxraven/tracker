@@ -3621,8 +3621,18 @@ function modalPanel(overlay) {
 function openModals() {
     return Array.from(document.querySelectorAll('.modal-overlay.open'));
 }
-/* the one on top: the last one in document order that is open */
+/* The one on top is the one opened most recently — NOT the last in
+   document order. Those differ: a dialog opened from another dialog is
+   raised with z-index, but it may sit earlier in the markup (the PIN
+   dialog is written above Settings yet opens on top of it). Reading the
+   order from the document made the code mark the visible dialog inert,
+   which blocks every click and keypress in it. */
+const modalStack = [];
 function topModal() {
+    for (let i = modalStack.length - 1; i >= 0; i--) {
+        if (modalStack[i].classList.contains('open')) return modalStack[i];
+    }
+    /* nothing tracked yet — fall back to document order */
     const all = openModals();
     return all.length ? all[all.length - 1] : null;
 }
@@ -3665,6 +3675,9 @@ function syncModalBackground() {
 }
 
 function onModalOpened(overlay) {
+    const at = modalStack.indexOf(overlay);
+    if (at >= 0) modalStack.splice(at, 1);
+    modalStack.push(overlay);
     describeModal(overlay);
     modalReturnFocus.set(overlay.id, document.activeElement);
     syncModalBackground();
@@ -3678,6 +3691,8 @@ function onModalOpened(overlay) {
     }, 140);
 }
 function onModalClosed(overlay) {
+    const at = modalStack.indexOf(overlay);
+    if (at >= 0) modalStack.splice(at, 1);
     syncModalBackground();
     const back = modalReturnFocus.get(overlay.id);
     modalReturnFocus.delete(overlay.id);
