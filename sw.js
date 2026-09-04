@@ -10,7 +10,7 @@
    deleted on activate.
    ───────────────────────────────────────────────────────────── */
 
-const CACHE = 'tracker-v23';
+const CACHE = 'tracker-v24';
 
 /* Everything the app shell is made of. Paths are relative so the
    worker also works from a project subfolder (github.io/<repo>/). */
