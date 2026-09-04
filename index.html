@@ -792,21 +792,31 @@
                 <p>The backup file is for bringing the tracker back. These are for sending your records to a
                     spouse, an accountant, or anyone else. They are at the top of <span class="manual-key">Reports</span>.</p>
                 <p>First choose the scope: <span class="manual-key">Months</span> — all of them or just one — and <span class="manual-key">Accounts</span> — this
-                    one or both. The line underneath tells you exactly what will go out.</p>
+                    one or both. Then choose the <span class="manual-key">File</span>:</p>
                 <ul>
-                    <li><strong>Transactions (CSV)</strong> — every single entry: date, month, account, kind,
-                        category, type, note, amount and a signed amount.</li>
-                    <li><strong>Monthly summary (CSV)</strong> — one row per month: money in, transfers, money set
+                    <li><strong>Excel — formatted</strong> (the normal choice) — a proper <code>.xlsx</code>
+                        spreadsheet, laid out to be read rather than parsed: a title and a header block naming the
+                        period, accounts, currency and when it was made; a dark heading row that stays put as you
+                        scroll; filter buttons on every column; shaded alternate rows; amounts in real currency
+                        format with the thousands separators and your own symbol; and a bold <em>TOTAL</em> line at
+                        the foot. It opens in Excel, Numbers and Google Sheets.</li>
+                    <li><strong>CSV — plain text</strong> — the same table with no formatting, for feeding into
+                        another program. It still carries the title and header block, and the totals line.</li>
+                </ul>
+                <p>Whichever you pick, the three buttons give you:</p>
+                <ul>
+                    <li><strong>Transactions</strong> — every single entry: date, month, account, kind,
+                        category, type, note, and the amount under <em>Money in</em> or <em>Money out</em>.</li>
+                    <li><strong>Monthly summary</strong> — one row per month: money in, transfers, money set
                         aside, spent, loan payments, total out, budgeted and net.</li>
-                    <li><strong>Category budgets (CSV)</strong> — budget, spent, left and percent used per
-                        category, with an <em>Over budget</em> marker.</li>
+                    <li><strong>Category budgets</strong> — budget, spent, left and percent used per
+                        category. Rows you overspent are shaded red and marked <em>Over budget</em>.</li>
                     <li><strong>Print / Save as PDF</strong> — a clean printed sheet: month-by-month totals,
                         budget against actual, savings goals, then every entry. In the print window choose your
                         printer, or <em>Save as PDF</em> to get a file.</li>
                 </ul>
-                <p>The CSV files open in Excel, Numbers and Google Sheets. Amounts are always written in full, even
-                    when the eye is hiding them on screen — a hidden export would be no use to whoever you send
-                    it to.</p>
+                <p>Amounts are always written in full, even when the eye is hiding them on screen — a hidden
+                    export would be no use to whoever you send it to.</p>
             </div>
 
             <div class="manual-section">
@@ -1161,11 +1171,18 @@
                             <option value="both">Both accounts</option>
                         </select>
                     </div>
+                    <div class="export-field">
+                        <label for="exportFormat">File</label>
+                        <select id="exportFormat" onchange="renderExportHint()">
+                            <option value="xlsx">Excel — formatted</option>
+                            <option value="csv">CSV — plain text</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="export-actions">
-                    <button class="export-btn" onclick="exportTransactionsCsv()">Transactions (CSV)</button>
-                    <button class="export-btn" onclick="exportSummaryCsv()">Monthly summary (CSV)</button>
-                    <button class="export-btn" onclick="exportBudgetsCsv()">Category budgets (CSV)</button>
+                    <button class="export-btn" onclick="exportTransactionsCsv()">Transactions</button>
+                    <button class="export-btn" onclick="exportSummaryCsv()">Monthly summary</button>
+                    <button class="export-btn" onclick="exportBudgetsCsv()">Category budgets</button>
                     <button class="export-btn primary" onclick="printReport()">Print / Save as PDF</button>
                 </div>
                 <p class="export-hint" id="exportHint"></p>
