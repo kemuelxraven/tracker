@@ -410,6 +410,8 @@
                     <button type="button" class="storage-btn" onclick="renderOfflineStatus()">Check again</button>
                     <button type="button" class="storage-btn ghost" onclick="refreshOfflineCopy()">Save for offline
                         now</button>
+                    <button type="button" class="storage-btn ghost" onclick="forceUpdate()">Get the newest
+                        version</button>
                 </div>
                 <p class="settings-hint">The tracker keeps its own copy of itself on this device so it opens with no
                     signal. It needs <strong>one full visit with a connection</strong> first, and the address must
@@ -940,6 +942,12 @@
                         tap <span class="manual-key">Share</span> then <span class="manual-key">Add to Home
                         Screen</span>. Either way, opening it from that icon is far more dependable with no signal
                         than a browser tab, and it opens without the address bar.</li>
+                    <li><strong>Still behaving like the old version?</strong> The offline copy is served first so
+                        the tracker opens instantly, which means a phone can keep running older code for a while.
+                        <span class="manual-key">Data ▾</span> → <span class="manual-key">Settings</span> →
+                        <em>Works offline</em> shows which version this device has, and
+                        <span class="manual-key">Get the newest version</span> fetches and switches to the latest
+                        one straight away.</li>
                     <li><strong>Not sure it is ready?</strong> <span class="manual-key">Data ▾</span> →
                         <span class="manual-key">Settings</span> → <em>Works offline</em> tells you in plain words
                         whether the tracker has saved itself to this device, and how many files it has. If it says
