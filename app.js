@@ -1306,7 +1306,10 @@ function toggleCat(catId) {
    transfers — over any span of dates, in one account or both.
    ════════════════════════════════════════════════════════════════ */
 let logsFilter = 'all';        /* all | spent | loan | in | transfer */
-let logsRange = 'month';       /* month | 3m | 6m | year | all | custom */
+/* Opens on every entry rather than the current month: a tracker with a
+   year of records behind it looked almost empty on the first open, which
+   read as lost data rather than a filter. */
+let logsRange = 'all';         /* month | 3m | 6m | year | all | custom */
 let logsFrom = '', logsTo = '';
 let logsScope = 'active';      /* active | both */
 function catMark(name) { return (name || '?').trim().charAt(0).toUpperCase() || '?' }
@@ -1339,7 +1342,7 @@ function logsRangeLabel() {
 function openLogs() {
     document.getElementById('logsModal').classList.add('open');
     document.getElementById('logsSearch').value = '';
-    logsFilter = 'all'; logsRange = 'month'; logsScope = 'active';
+    logsFilter = 'all'; logsRange = 'all'; logsScope = 'active';
     refreshLogs();
 }
 function closeLogs() { document.getElementById('logsModal').classList.remove('open') }
