@@ -100,10 +100,15 @@ function save() {
     refreshSnapshot();
     return true;
 }
-function adoptStore(data) {
+/* keepSettings: for a backup that carries records but no settings. Without
+   it such a file silently reset the currency, both tab names, the budget
+   cycle, the theme and even the PIN back to defaults — losing settings the
+   file never claimed to replace. Starting fresh still wants the defaults,
+   so it is only asked for on import. */
+function adoptStore(data, keepSettings) {
     const active = (data && data.active === 'cash') ? 'cash' : 'bank';
     const accts = (data && data.accounts) || {};
-    const inSet = (data && data.settings) || {};
+    const inSet = (data && data.settings) || (keepSettings ? (store.settings || {}) : {});
     store = {
         active,
         settings: {
@@ -1868,7 +1873,7 @@ function confirmImport() {
     recoveryMode = false;   /* the user has chosen; saving is safe again */
     if (pendingImportData && pendingImportData.media) saveMedia(pendingImportData.media);
     if (!pendingImportData) return; const { _bank_backup, _maribank_backup, _version, _exportedAt, ...restored } = pendingImportData;
-    if (restored.accounts) adoptStore(restored);
+    if (restored.accounts) adoptStore(restored, !restored.settings);
     else { store.accounts[store.active] = normalizeAccount(restored); state = store.accounts[store.active] }
     save(); closeBackup(); applySettings(); applyAppearance(); syncAccountUI(); render();
     showToast('Data restored');
@@ -2078,6 +2083,10 @@ window.addEventListener('online', showOfflineState);
 window.addEventListener('offline', showOfflineState);
 showOfflineState();
 
+/* Bump together with CACHE in sw.js. Shown in Settings so the version a
+   device is actually running can be read off the screen — without it,
+   "it still behaves like the old one" is impossible to check. */
+const APP_VERSION = 'v24';
 let swError = null;
 (function registerOfflineWorker() {
     /* Service workers only exist over http(s); opening the file
@@ -4535,7 +4544,8 @@ async function renderOfflineStatus() {
         `Worker: ${s.registered ? vizEsc(s.state || 'yes') : 'none'} · ` +
         `In charge of this page: ${s.controlled ? 'yes' : 'no'} · ` +
         `Files saved: ${s.cached == null ? '0' : s.cached} · ` +
-        `Installed: ${isInstalled() ? 'yes' : 'no'}` +
+        `Installed: ${isInstalled() ? 'yes' : 'no'} · ` +
+        `App ${APP_VERSION}` +
         (s.cacheName ? ' · ' + vizEsc(s.cacheName) : '') +
         `</p>`;
 }
@@ -4591,4 +4601,37 @@ async function installApp() {
     try { await deferredInstall.userChoice } catch (e) { }
     deferredInstall = null;
     renderOfflineStatus();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FORCING AN UPDATE
+
+   The offline copy is deliberately served cache-first, which is what
+   makes the tracker open instantly with no signal — but it also means
+   a device can keep running old code until it happens to notice a new
+   version. This asks for the check on demand, takes the new worker
+   straight away, and reloads onto it.
+   ════════════════════════════════════════════════════════════════ */
+async function forceUpdate() {
+    if (!('serviceWorker' in navigator)) { location.reload(true); return }
+    showToast('Checking for a newer version…');
+    try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) { location.reload(); return }
+        await reg.update();
+        /* give the new worker a moment to reach "installed" */
+        await new Promise(r => setTimeout(r, 1500));
+        const waiting = reg.waiting;
+        if (waiting) {
+            /* controllerchange reloads the page once this takes over */
+            waiting.postMessage('skip-waiting');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showToast('Already on the newest version');
+            renderOfflineStatus();
+        }
+    } catch (e) {
+        showToast('Could not check — reloading');
+        setTimeout(() => location.reload(), 600);
+    }
 }
