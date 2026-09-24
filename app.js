@@ -698,9 +698,17 @@ function setBaseBudget(cat, period, amount) {
     if (!cat.periods) cat.periods = {};
     cat.periods[period] = Math.max(0, Number(amount) || 0);
 }
-function catBudget(cat, period) { return baseBudget(cat, period) }
-function catTotalBudget(period) { return state.categories.reduce((s, c) => s + catBudget(c, period), 0) }
-function catTotalRem() { return state.categories.reduce((s, c) => s + Math.max(0, catBudget(c) - catSpent(c)), 0) }
+/* A deleted category is archived, not erased: its expenses were real money
+   out, so they stay in Total Spent and the account balance. It simply stops
+   showing, and from the month it was deleted it holds no budget. */
+function liveCats() { return state.categories.filter(c => !c.archived) }
+function catBudget(cat, period) {
+    const key = period || activePeriod;
+    if (cat.archived && cat.archivedPeriod && key >= cat.archivedPeriod) return 0;
+    return baseBudget(cat, period);
+}
+function catTotalBudget(period) { return liveCats().reduce((s, c) => s + catBudget(c, period), 0) }
+function catTotalRem() { return liveCats().reduce((s, c) => s + Math.max(0, catBudget(c) - catSpent(c)), 0) }
 function isDepleted(cat, period) { const b = catBudget(cat, period); return b > 0 && catSpent(cat, period) >= b }
 /* everything one category card needs, for the month on screen */
 function catStats(cat) {
@@ -1294,8 +1302,16 @@ function saveEdit() {
 }
 
 function deleteCategory(catId) {
-    if (!confirm('Delete this category and all its expenses?')) return;
-    state.categories = state.categories.filter(c => c.id !== catId); save(); render(); showToast('Category deleted');
+    const cat = state.categories.find(c => c.id === catId); if (!cat) return;
+    if (!confirm(`Delete ${cat.name}? Its past expenses stay counted in Total Spent and your balance.`)) return;
+    if ((cat.expenses || []).length === 0) {
+        state.categories = state.categories.filter(c => c.id !== catId);
+    } else {
+        /* archived rows live at the end, so the visible order keeps its indexes */
+        cat.archived = true; cat.archivedPeriod = activePeriod;
+        state.categories = state.categories.filter(c => c.id !== catId).concat(cat);
+    }
+    save(); render(); showToast('Category deleted');
 }
 
 function toggleCat(catId) {
@@ -1748,7 +1764,7 @@ function render() {
     renderBudgetCard(); renderPeriodBar();
     const list = document.getElementById('categoriesList'); const empty = document.getElementById('emptyState');
     renderCatSortBar();
-    if (state.categories.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return }
+    if (liveCats().length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return }
     empty.style.display = 'none'; const todayVal = periodDefaultDate();
     list.classList.toggle('reorderable', catSort() === 'custom');
     list.innerHTML = sortedCategories().map((cat, i) => {
@@ -1823,7 +1839,7 @@ function openBackup() {
     document.getElementById('btnMergeImport').classList.remove('show');
     document.getElementById('importFileInput').value = '';
     const line = key => {
-        const acct = store.accounts[key]; const cats = acct.categories.length;
+        const acct = store.accounts[key]; const cats = acct.categories.filter(c => !c.archived).length;
         const exps = acct.categories.reduce((s, c) => s + c.expenses.length, 0);
         return `${accountLabel(key)}: ${cats} categor${cats === 1 ? 'y' : 'ies'}, ${exps} expense${exps === 1 ? '' : 's'}`;
     };
@@ -2407,7 +2423,7 @@ function vizTrendHtml() {
 
 /* ════════ 3. BUDGET VS ACTUAL — bars ════════ */
 function vizBudgetRows(period) {
-    return state.categories.map(c => ({
+    return state.categories.filter(c => !c.archived || catBudget(c, period) > 0 || catSpent(c, period) > 0).map(c => ({
         name: c.name,
         budget: catBudget(c, period),
         spent: catSpent(c, period)
@@ -3633,7 +3649,7 @@ function accountExcess() {
 }
 function goalCatOptions(selected) {
     const excess = accountExcess();
-    const cats = state.categories.map(c => {
+    const cats = liveCats().map(c => {
         const left = Math.max(0, catBudget(c, activePeriod) - catSpent(c, activePeriod));
         return `<option value="${c.id}"${c.id === selected ? ' selected' : ''}>${vizEsc(c.name)} — ${vizEsc(valuesHidden ? mask() : fmt(left))} left</option>`;
     }).join('');
@@ -4123,14 +4139,14 @@ function toggleCatSortDir() {
 }
 function sortedCategories() {
     const mode = catSort();
-    if (mode === 'custom') return state.categories.slice();
+    if (mode === 'custom') return liveCats();
     const dir = catSortDir() === 'desc' ? -1 : 1;
     const key = c => {
         if (mode === 'name') return null;
         const st = catStats(c);
         return mode === 'remaining' ? st.rem : st.spent;
     };
-    return state.categories.slice().sort((a, b) => {
+    return liveCats().sort((a, b) => {
         if (mode === 'name') return dir * a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
         const d = key(a) - key(b);
         /* ties fall back to the name, so the list never shuffles at random */
@@ -4139,7 +4155,7 @@ function sortedCategories() {
 }
 function renderCatSortBar() {
     const bar = document.getElementById('catSortBar'); if (!bar) return;
-    bar.style.display = state.categories.length > 1 ? '' : 'none';
+    bar.style.display = liveCats().length > 1 ? '' : 'none';
     const mode = catSort();
     bar.querySelectorAll('.cat-sort-btn').forEach(b => {
         const on = b.dataset.sort === mode;
@@ -4161,7 +4177,7 @@ function renderCatSortBar() {
 function moveCategory(id, toIndex) {
     const from = state.categories.findIndex(c => c.id === id);
     if (from < 0) return false;
-    const to = Math.max(0, Math.min(state.categories.length - 1, toIndex));
+    const to = Math.max(0, Math.min(liveCats().length - 1, toIndex));
     if (to === from) return false;
     const [item] = state.categories.splice(from, 1);
     state.categories.splice(to, 0, item);
@@ -4262,7 +4278,8 @@ function dragEnd(ev) {
     const order = catCards().map(c => c.dataset.cat);
     const moved = order.some((catId, i) => state.categories[i] && state.categories[i].id !== catId);
     if (!moved) return;
-    state.categories.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    const pos = c => { const i = order.indexOf(c.id); return i < 0 ? Infinity : i };
+    state.categories.sort((a, b) => pos(a) - pos(b));
     save(); render();
     const grip2 = document.querySelector(`[data-grip="${id}"]`);
     if (grip2) grip2.focus();
