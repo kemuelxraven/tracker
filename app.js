@@ -702,20 +702,38 @@ function setBaseBudget(cat, period, amount) {
    out, so they stay in Total Spent and the account balance. It simply stops
    showing, and from the month it was deleted it holds no budget. */
 function liveCats() { return state.categories.filter(c => !c.archived) }
+/* What was left unspent last month rolls into this one, automatically.
+   Walks forward from the category's first month, so a rolled-over balance
+   itself rolls on if it too goes unused. Overspending never carries as debt. */
+function carriedIn(cat, period) {
+    const key = period || activePeriod;
+    const spentBy = {};
+    (cat.expenses || []).forEach(e => { const p = periodOf(e); spentBy[p] = (spentBy[p] || 0) + Number(e.amount) });
+    const keys = Object.keys(spentBy).concat(Object.keys(cat.periods || {})).filter(k => k !== '0000-00');
+    if (!keys.length) return 0;
+    let p = keys.reduce((a, b) => a < b ? a : b), carry = 0;
+    if (cat.archived && cat.archivedPeriod && key > cat.archivedPeriod) return 0;
+    while (p < key) {
+        carry = Math.max(0, baseBudget(cat, p) + carry - (spentBy[p] || 0));
+        p = shiftPeriod(p, 1);
+    }
+    return carry;
+}
 function catBudget(cat, period) {
     const key = period || activePeriod;
     if (cat.archived && cat.archivedPeriod && key >= cat.archivedPeriod) return 0;
-    return baseBudget(cat, period);
+    return baseBudget(cat, period) + carriedIn(cat, period);
 }
 function catTotalBudget(period) { return liveCats().reduce((s, c) => s + catBudget(c, period), 0) }
 function catTotalRem() { return liveCats().reduce((s, c) => s + Math.max(0, catBudget(c) - catSpent(c)), 0) }
 function isDepleted(cat, period) { const b = catBudget(cat, period); return b > 0 && catSpent(cat, period) >= b }
 /* everything one category card needs, for the month on screen */
 function catStats(cat) {
+    const carried = catBudget(cat) > 0 ? carriedIn(cat) : 0;
     const budget = catBudget(cat), spent = catSpent(cat);
     const rem = budget - spent;
     return {
-        budget, spent, rem,
+        budget, spent, rem, carried,
         pct: budget > 0 ? Math.min((spent / budget) * 100, 100) : 0,
         depleted: budget > 0 && spent >= budget
     };
@@ -1784,7 +1802,7 @@ function render() {
                 <div class="cat-icon"><span class="cat-emoji">${icon}</span></div>
                 <div class="cat-info">
                     <div class="cat-name">${cat.name}<span class="badge-over" id="catBadge_${cat.id}" style="display:${rem < 0 ? 'inline' : 'none'}">Over!</span><span class="badge-zero" id="catZero_${cat.id}" style="display:${depleted && rem >= 0 ? 'inline' : 'none'}">Depleted</span></div>
-                    <div class="cat-sub">Budget: ${fmt(st.budget)}</div>
+                    <div class="cat-sub">Budget: ${fmt(st.budget)}${st.carried > 0 ? ` <span title="Unspent from previous months">(incl. ${fmt(st.carried)} carried over)</span>` : ''}</div>
                 </div>
                 <div class="cat-amounts">
                     <span class="cat-remaining${remCls}" id="catRem_${cat.id}">${fmt(rem)}</span>

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Money Tracker — Thank-You Page &amp; Gumroad Artwork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../TEST/va-kit/brand.css?v=24">
+<style>
+/* ============================================================
+   MONEY TRACKER — post-purchase thank-you page + Gumroad artwork
+   1 × A4 thank-you (595 × 842 pt)
+   1 × Gumroad cover     (1280 × 720 px)
+   1 × Gumroad thumbnail (600 × 600 px)
+
+   Palette: Cadet gray · Rose quartz · Champagne pink ·
+            Pale Dogwood · Beaver — plus ONE added ink, and the
+            reason for it is spelled out below the boards.
+   ============================================================ */
+
+:root{
+  --ivory:#EADBD6; --ivory-deep:#C9ADA7;
+  --espresso:#3E3239; --charcoal:#3E3239;
+  --taupe:#AC7E6E; --taupe-pale:#C9ADA7;
+  --sage:#9A8C98; --rose:#97A2A6;
+  --serif:"Cormorant Garamond",Georgia,serif;
+  --sans:"Montserrat",system-ui,sans-serif;
+}
+
+/* two scopes, two scales — each must set --s AND --pt AND --hair */
+.a4{--s:0.8;--pt:0.8px;--hair:0.4px;}
+.gum{--s:0.56;--pt:0.56px;--hair:0.56px;}
+
+.sheet{position:relative;overflow:hidden;background:var(--ivory);
+  box-shadow:0 1px 2px rgba(62,50,57,.10),0 18px 40px -14px rgba(62,50,57,.28);}
+.a4-sheet{width:calc(595 * var(--pt));height:calc(842 * var(--pt));}
+.cover{width:calc(1280 * var(--pt));height:calc(720 * var(--pt));}
+.thumb{width:calc(600 * var(--pt));height:calc(600 * var(--pt));}
+.a4 .guide-safe{inset:calc(48 * var(--pt));}
+.gum .guide-safe{inset:calc(60 * var(--pt));}
+.sheet .bleed-frame{inset:calc(-9 * var(--pt));}
+.boards{gap:40px;align-items:flex-start;}
+.at{position:absolute;}
+.sh{position:absolute;}
+.full{left:calc(48 * var(--pt));right:calc(48 * var(--pt));}
+.board-tag{margin-bottom:10px;}
+
+/* ---------- shared type ---------- */
+.t-mark{width:calc(34 * var(--pt));height:calc(34 * var(--pt));border-radius:calc(2 * var(--pt));
+  background:var(--sage);display:flex;align-items:center;justify-content:center;}
+.t-mark span{font-family:var(--serif);font-weight:600;font-size:calc(17 * var(--pt));
+  color:var(--ivory);line-height:1;letter-spacing:.02em;}
+.t-word{font-family:var(--sans);font-weight:500;font-size:calc(11 * var(--pt));
+  letter-spacing:.30em;text-transform:uppercase;color:var(--espresso);margin:0;line-height:1;}
+.t-word i{display:block;font-style:normal;font-weight:300;font-size:calc(6.6 * var(--pt));
+  letter-spacing:.24em;color:var(--taupe);margin-top:calc(5 * var(--pt));}
+
+.t-eyebrow{font-family:var(--sans);font-weight:500;font-size:calc(7.5 * var(--pt));
+  letter-spacing:.30em;text-transform:uppercase;color:var(--taupe);margin:0;}
+.t-title{font-family:var(--serif);font-weight:400;font-size:calc(58 * var(--pt));
+  letter-spacing:.005em;color:var(--espresso);margin:0;line-height:1;}
+.t-lead{font-family:var(--sans);font-weight:300;font-size:calc(10 * var(--pt));
+  line-height:1.75;letter-spacing:.01em;color:var(--espresso);margin:0;}
+.t-body{font-family:var(--sans);font-weight:300;font-size:calc(8.4 * var(--pt));
+  line-height:1.7;letter-spacing:.01em;color:var(--espresso);margin:0;}
+.t-h2{font-family:var(--serif);font-weight:500;font-size:calc(19 * var(--pt));
+  letter-spacing:.01em;color:var(--espresso);margin:0;line-height:1.1;}
+.t-lbl{font-family:var(--sans);font-weight:500;font-size:calc(7 * var(--pt));
+  letter-spacing:.26em;text-transform:uppercase;color:var(--taupe);margin:0;}
+
+.t-rule{left:calc(48 * var(--pt));right:calc(48 * var(--pt));height:calc(1 * var(--pt));background:var(--taupe);}
+.t-hair{height:var(--hair);background:var(--taupe-pale);}
+
+/* link cards */
+.lcard{background:transparent;border:calc(1 * var(--pt)) solid var(--taupe-pale);
+  padding:calc(20 * var(--pt)) calc(20 * var(--pt)) calc(18 * var(--pt));}
+.lcard .num{font-family:var(--serif);font-weight:400;font-size:calc(30 * var(--pt));
+  color:var(--taupe-pale);line-height:1;margin:0;}
+.lcard h3{font-family:var(--serif);font-weight:500;font-size:calc(16 * var(--pt));
+  color:var(--espresso);margin:calc(6 * var(--pt)) 0 0;line-height:1.15;letter-spacing:.01em;}
+.lcard .d{font-family:var(--sans);font-weight:300;font-size:calc(8 * var(--pt));
+  line-height:1.6;color:var(--espresso);margin:calc(7 * var(--pt)) 0 0;}
+.lcard .url{font-family:var(--sans);font-weight:500;font-size:calc(8.4 * var(--pt));
+  letter-spacing:.02em;color:var(--espresso);margin:calc(12 * var(--pt)) 0 0;
+  border-top:var(--hair) solid var(--taupe-pale);padding-top:calc(10 * var(--pt));word-break:break-all;}
+
+/* four-step grid */
+.step .n{font-family:var(--sans);font-weight:500;font-size:calc(7 * var(--pt));
+  letter-spacing:.24em;color:var(--taupe);margin:0;}
+.step h4{font-family:var(--serif);font-weight:500;font-size:calc(12.5 * var(--pt));
+  color:var(--espresso);margin:calc(5 * var(--pt)) 0 0;line-height:1.15;}
+.step p{font-family:var(--sans);font-weight:300;font-size:calc(7.8 * var(--pt));
+  line-height:1.65;color:var(--espresso);margin:calc(5 * var(--pt)) 0 0;}
+
+.notebox{background:var(--sage);padding:calc(14 * var(--pt)) calc(20 * var(--pt));}
+.notebox .k{font-family:var(--sans);font-weight:500;font-size:calc(7 * var(--pt));
+  letter-spacing:.26em;text-transform:uppercase;color:var(--ivory);margin:0 0 calc(7 * var(--pt));}
+.notebox p{font-family:var(--sans);font-weight:400;font-size:calc(8 * var(--pt));
+  line-height:1.7;color:var(--ivory);margin:0;}
+
+.t-foot{display:flex;justify-content:space-between;align-items:baseline;gap:calc(20 * var(--pt));
+  border-top:var(--hair) solid var(--taupe-pale);padding-top:calc(10 * var(--pt));}
+.t-foot p{font-family:var(--sans);font-weight:300;font-size:calc(7.4 * var(--pt));
+  letter-spacing:.14em;text-transform:uppercase;color:var(--espresso);margin:0;}
+.t-foot p.b{font-weight:500;}
+
+/* ---------- shapes ---------- */
+.arch{border-radius:999px 999px 0 0;}
+.chip{display:inline-flex;align-items:center;gap:calc(6 * var(--pt));
+  border:calc(1 * var(--pt)) solid var(--taupe-pale);padding:calc(6 * var(--pt)) calc(11 * var(--pt));
+  font-family:var(--sans);font-weight:400;font-size:calc(11 * var(--pt));
+  letter-spacing:.10em;color:var(--espresso);}
+.chip b{width:calc(5 * var(--pt));height:calc(5 * var(--pt));border-radius:50%;background:var(--taupe);}
+
+.grain{inset:0;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:calc(160 * var(--pt)) calc(160 * var(--pt));}
+
+/* ---------- cover / thumbnail type ---------- */
+.c-word{font-family:var(--sans);font-weight:500;font-size:calc(20 * var(--pt));
+  letter-spacing:.36em;text-transform:uppercase;color:var(--espresso);margin:0;line-height:1;}
+.c-title{font-family:var(--serif);font-weight:400;font-size:calc(74 * var(--pt));
+  letter-spacing:.005em;color:var(--espresso);margin:0;line-height:1.02;}
+.c-sub{font-family:var(--sans);font-weight:300;font-size:calc(19 * var(--pt));
+  line-height:1.6;color:var(--espresso);margin:0;}
+.c-kicker{font-family:var(--sans);font-weight:500;font-size:calc(13 * var(--pt));
+  letter-spacing:.30em;text-transform:uppercase;color:var(--taupe);margin:0;}
+
+.th-title{font-family:var(--serif);font-weight:400;font-size:calc(66 * var(--pt));
+  letter-spacing:.005em;color:var(--espresso);margin:0;line-height:1;}
+.th-word{font-family:var(--sans);font-weight:500;font-size:calc(15 * var(--pt));
+  letter-spacing:.34em;text-transform:uppercase;color:var(--espresso);margin:0;line-height:1;}
+.th-sub{font-family:var(--sans);font-weight:300;font-size:calc(17 * var(--pt));
+  line-height:1.5;color:var(--espresso);margin:0;}
+
+/* ---------- copy blocks ---------- */
+.copyblock{background:var(--ivory);border:1px solid var(--taupe-pale);border-radius:2px;
+  padding:20px 22px 22px;margin-bottom:20px;}
+.copyblock h4{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--taupe);margin:0 0 4px;}
+.copyblock .cnt{font-family:var(--sans);font-size:10px;color:#8A7A80;margin:0 0 12px;letter-spacing:.04em;}
+.copyblock pre{font-family:var(--sans);font-size:12.5px;line-height:1.75;color:var(--espresso);
+  white-space:pre-wrap;margin:0;}
+.copyblock pre b{font-weight:600;}
+</style>
+</head>
+<body class="inspect-on">
+
+<header class="masthead">
+  <div class="masthead-in">
+    <div>
+      <p class="kit">Money Tracker — a private, offline budget tracker</p>
+      <h1>Thank-You Page &amp; Gumroad Artwork</h1>
+      <p class="sub">1 × A4 thank-you · 1 × Gumroad cover · 1 × Gumroad thumbnail — plus the listing copy</p>
+    </div>
+    <div class="idx">
+      Palette: <b>Cadet · Rose quartz · Champagne · Dogwood · Beaver</b><br>
+      A4 in <b>points</b> · Gumroad art in <b>pixels</b><br>
+      Rebuild by hand in <b>Canva</b>
+    </div>
+  </div>
+</header>
+
+<div class="chrome">
+
+  <div class="toolbar">
+    <span class="lbl">View</span>
+    <button class="tgl" data-toggle="inspect-on" aria-pressed="true">Spec inspect</button>
+    <button class="tgl" data-toggle="guides-on" aria-pressed="false">Margins &amp; bleed</button>
+    <span class="lbl" style="margin-left:12px">Scale</span>
+    <span style="font-size:11px;color:var(--taupe);letter-spacing:.06em">A4 at 80% · Gumroad art at 56%</span>
+  </div>
+
+  <p class="hint">
+    Three boards and the words to go with them. The <b>A4 thank-you page</b> is what a buyer opens straight after
+    paying — it carries the link to the tracker, the link to the walkthrough video, a four-step start, and the one
+    warning they genuinely need to read. The <b>cover</b> and <b>thumbnail</b> are the two images Gumroad asks for,
+    at the exact sizes it wants. <b>Hover anything for its spec.</b>
+  </p>
+  <p class="hint" style="border-left:2px solid var(--taupe);padding-left:12px;margin-top:-10px">
+    <b>One honest addition to the palette.</b> All five swatches are mid-tones — the darkest, Beaver&nbsp;#AC7E6E, reaches
+    only <b>2.5:1</b> against Champagne pink, where readable body text needs 4.5:1. So the five colours do all the
+    colour work (grounds, shapes, rules, accents) and every <b>word</b> is set in one added ink, <b>#3E3239</b>, which is
+    Rose quartz taken down to 22% lightness so it stays in the same family. Swap it for your own dark if you prefer —
+    it is used in exactly one place, the type.
+  </p>
+
+  <!-- ==================== 01 · A4 THANK-YOU ==================== -->
+  <div class="section-head">
+    <div class="n">01</div>
+    <div><h2>Thank-you page</h2><p>A4 · 595 × 842 pt · 210 × 297 mm · 794 × 1123 px. Attach it as the PDF a buyer
+      receives on Gumroad, or paste its text into the receipt email. Everything in brackets is yours to replace.</p></div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="boards a4">
+    <div class="board-wrap">
+      <p class="board-tag">Thank you <span>595 × 842 pt · print or PDF</span></p>
+      <div data-art class="sheet a4-sheet"
+           data-spec="Page — Thank you" data-kind="A4 portrait · the post-purchase page"
+           data-fill="#EADBD6 — Champagne pink" data-size2="595 × 842 pt"
+           data-pos="x 0 · y 0" data-layer="Layer 1"
+           data-canva="Create → Custom size → 210 × 297 mm (Canva will show points). Page background #EADBD6."
+           data-edit="Swap the ground for Pale Dogwood #C9ADA7 for a warmer page. Keep the ink dark whatever you choose."
+           data-note="Champagne pink rather than white on purpose. A thank-you page is the <b>first thing a buyer sees after paying</b>, and a tinted ground reads as considered where plain white reads as a system receipt.">
+        <div class="bleed-frame"></div>
+
+        <div class="sh arch" style="right:calc(-90 * var(--pt));top:calc(-120 * var(--pt));width:calc(340 * var(--pt));height:calc(560 * var(--pt));background:var(--ivory-deep);opacity:.55"
+             data-spec="Corner arch" data-kind="Shape · arch, three quarters off-page"
+             data-fill="#C9ADA7 Pale Dogwood at 55%"
+             data-size2="340 × 560 pt · top corners fully rounded"
+             data-pos="right −90 pt · top −120 pt" data-opacity="55%" data-layer="Layer 2"
+             data-effect="None"
+             data-canva="Rectangle → round the top two corners fully → fill Pale Dogwood → Transparency 45 → drag it off the top-right corner."
+             data-edit="Delete it for a plainer page, or mirror it to the left."
+             data-note="It sits <b>behind the title and mostly off the page</b>, so you read it as a curve of colour rather than as a shape. Anything a reader can name as an object competes with the words; a fragment does not."></div>
+
+        <div class="at" style="left:calc(48 * var(--pt));top:calc(48 * var(--pt));display:flex;align-items:center;gap:calc(12 * var(--pt))">
+          <div class="t-mark"
+               data-spec="Logo mark" data-kind="Shape · square with a letter"
+               data-fill="#9A8C98 Rose quartz" data-size2="34 × 34 pt · 2 pt corner radius"
+               data-pos="x 48 pt · y 48 pt" data-layer="Layer 3"
+               data-canva="Square, fill Rose quartz, corner rounding 2. Drop your own logo on top if you have one — keep it inside the 34 pt square."
+               data-edit="Replace the letter with your mark, or recolour the square to Beaver."
+               data-note="A mark this small is <b>identification, not branding</b>. On a page whose whole job is to hand over two links, anything bigger is in the way."><span>₱</span></div>
+          <p class="t-word"
+             data-spec="Wordmark" data-kind="Primary text · hierarchy 3"
+             data-font="Montserrat  (Canva free)" data-size="11 pt · 46 px @300dpi"
+             data-weight="Medium 500" data-style="Normal" data-case="UPPERCASE"
+             data-track="0.30 em · Canva: 300" data-lh="1" data-align="Left"
+             data-color="#3E3239 — Ink" data-pos="x 94 pt · centred on the mark" data-layer="Layer 3"
+             data-edit="Your product name and a one-line descriptor."
+             data-note="Very wide tracking at a small size is what makes a wordmark read as a <b>logotype rather than a heading</b>. 300 is the most Canva will give you and it is exactly right here.">Money Tracker<i>Private · Offline · Yours</i></p>
+        </div>
+
+        <div class="at" style="right:calc(48 * var(--pt));top:calc(50 * var(--pt));text-align:right">
+          <p class="t-lbl">Your purchase</p>
+          <p class="t-body" style="margin-top:calc(6 * var(--pt))">Order <b>[#0000-0000]</b><br>[00 Month 2026]</p>
+        </div>
+
+        <div class="sh t-rule" style="top:calc(112 * var(--pt))"
+             data-spec="Header rule" data-kind="Shape · rule"
+             data-fill="#AC7E6E Beaver" data-size2="499 × 1 pt"
+             data-pos="x 48 pt · y 112 pt" data-layer="Layer 3"
+             data-effect="None"
+             data-canva="Elements → Lines → straight, weight 1 pt, colour #AC7E6E."
+             data-edit="Recolour, or drop to a hairline."
+             data-note="Beaver is the <b>darkest swatch in the palette</b>, so it is the only one strong enough to draw a line that reads at arm's length. It is used here for rules and numerals and nowhere for words."></div>
+
+        <p class="at t-eyebrow" style="left:calc(48 * var(--pt));top:calc(140 * var(--pt))">Everything is ready</p>
+        <h1 class="at t-title" style="left:calc(48 * var(--pt));top:calc(160 * var(--pt))"
+            data-spec="Page title" data-kind="Primary text · hierarchy 1"
+            data-font="Cormorant Garamond  (Canva free)" data-size="58 pt · 242 px @300dpi"
+            data-weight="Regular 400 — light on purpose" data-style="Normal"
+            data-case="Sentence case" data-track="0.005 em · Canva: 5" data-lh="1"
+            data-align="Left" data-color="#3E3239 — Ink" data-pos="x 48 pt · y 160 pt" data-layer="Layer 4"
+            data-edit="“Thank you.” · “You're all set.” · “Welcome.”"
+            data-note="Set in <b>Regular, not Bold</b>. A large light serif reads as gracious; the same words in bold read as a shout. The full stop is doing real work too — it closes the sentence so the eye moves down to the links instead of waiting for more.">Thank you.</h1>
+
+        <p class="at t-lead" style="left:calc(48 * var(--pt));width:calc(360 * var(--pt));top:calc(236 * var(--pt))">
+          Your tracker is ready to open. It runs in your browser, keeps every record on your own device, and works
+          with no internet after the first visit. Two links, and you are started.</p>
+
+        <div class="at lcard" style="left:calc(48 * var(--pt));width:calc(240 * var(--pt));top:calc(316 * var(--pt))"
+             data-spec="Link card" data-kind="Component · ×2"
+             data-fill="None — the page shows through" data-stroke="#C9ADA7 Pale Dogwood · 1 pt · square corners"
+             data-size2="240 × 168 pt · 20 pt padding · 19 pt gutter between the two"
+             data-pos="x 48 pt · y 316 pt — the second at x 307 pt" data-layer="Layer 4"
+             data-effect="None"
+             data-canva="Rectangle, no fill, 1 pt Pale Dogwood border. Build one, group it, duplicate and set X to 307."
+             data-edit="Paste your real links over the bracketed ones. Keep them short — a long URL will wrap to three lines and unbalance the pair."
+             data-note="<b>Outlined, not filled.</b> Two filled boxes on a tinted page turn into two heavy blocks; outlines let the ground run through so the cards read as areas rather than objects. The rule above each link is what separates the promise from the thing you click.">
+          <p class="num">01</p>
+          <h3>Open your tracker</h3>
+          <p class="d">Bookmark it on your phone, then add it to your home screen so it opens like an app.</p>
+          <p class="url">[yourdomain.com/tracker]</p>
+        </div>
+        <div class="at lcard" style="left:calc(307 * var(--pt));width:calc(240 * var(--pt));top:calc(316 * var(--pt))">
+          <p class="num">02</p>
+          <h3>Watch the walkthrough</h3>
+          <p class="d">Eight minutes, start to finish — setting a budget, logging spending, loans and goals.</p>
+          <p class="url">[youtu.be/your-video-id]</p>
+        </div>
+
+        <p class="at t-h2" style="left:calc(48 * var(--pt));top:calc(496 * var(--pt))">Start in four steps</p>
+        <div class="sh t-hair" style="left:calc(48 * var(--pt));right:calc(48 * var(--pt));top:calc(526 * var(--pt))"></div>
+
+        <div class="at step" style="left:calc(48 * var(--pt));width:calc(240 * var(--pt));top:calc(542 * var(--pt))"
+             data-spec="Start step" data-kind="Component · ×4 in a 2 × 2 grid"
+             data-size2="240 pt wide · 19 pt column gutter · 24 pt row gutter"
+             data-pos="x 48 / 307 pt · y 542 / 626 pt" data-layer="Layer 4"
+             data-canva="Build one step, group it, then duplicate three times and place on the four positions."
+             data-edit="Four steps, not five. If you need a fifth, it belongs in the video, not here."
+             data-note="Two columns of two, not a single list of four. A <b>2 × 2 grid reads as “a short job”</b> where a four-item column reads as a checklist — and the whole point of this page is that starting takes minutes.">
+          <p class="n">Step 01</p><h4>Name your two wallets</h4>
+          <p>Bank and Cash by default. Rename them to whatever you actually use — GCash, Savings, Payroll.</p>
+        </div>
+        <div class="at step" style="left:calc(307 * var(--pt));width:calc(240 * var(--pt));top:calc(542 * var(--pt))">
+          <p class="n">Step 02</p><h4>Add money in</h4>
+          <p>Your budget is the sum of what you deposit, so log your pay first. Nothing is typed in by hand.</p>
+        </div>
+        <div class="at step" style="left:calc(48 * var(--pt));width:calc(240 * var(--pt));top:calc(626 * var(--pt))">
+          <p class="n">Step 03</p><h4>Build your categories</h4>
+          <p>Give each one a monthly amount. Tick “use this every month” and it rebuilds itself on payday.</p>
+        </div>
+        <div class="at step" style="left:calc(307 * var(--pt));width:calc(240 * var(--pt));top:calc(626 * var(--pt))">
+          <p class="n">Step 04</p><h4>Take one backup</h4>
+          <p>Data → Backup &amp; Restore → Download. Do it today, then once a month. Please read the note below.</p>
+        </div>
+
+        <div class="at notebox full" style="top:calc(702 * var(--pt))"
+             data-spec="Warning box" data-kind="Shape · filled panel"
+             data-fill="#9A8C98 Rose quartz" data-size2="499 pt wide · 14 / 20 pt padding"
+             data-pos="x 48 pt · y 702 pt" data-layer="Layer 4"
+             data-effect="None"
+             data-canva="Rectangle filled #9A8C98, text in #EADBD6 Champagne pink at 8 pt or larger."
+             data-edit="Do not soften this. It is the one paragraph that prevents a refund request."
+             data-note="Champagne pink on Rose quartz is <b>2.5:1 — below the 4.5:1 needed for body text</b>, so this is set a little larger and heavier than the rest of the page to compensate. It is the only reversed type here, and it earns the exception because it is the single most important sentence a buyer will read.">
+          <p class="k">Read this once</p>
+          <p>Your records live on this device only — nobody else can see them, and nobody else can recover them.
+            Clearing browser data or switching phones will lose them. <b>Take a backup file today.</b></p>
+        </div>
+
+        <div class="at full t-foot" style="top:calc(783 * var(--pt));border-top:0;padding-top:0">
+          <p class="b">Questions? [hello@yourdomain.com]</p><p>Personal licence · one household</p>
+        </div>
+        <div class="sh grain"></div>
+        <div class="guide guide-safe"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 02 · GUMROAD ARTWORK ==================== -->
+  <div class="section-head">
+    <div class="n">02</div>
+    <div><h2>Gumroad artwork</h2><p>The cover at <b>1280 × 720 px</b> is the wide image at the top of the product page.
+      The thumbnail at <b>600 × 600 px</b> is the square that shows in search, in the library and on social cards —
+      it has to survive being 120 px wide, so it carries almost nothing.</p></div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="boards gum">
+    <div class="board-wrap">
+      <p class="board-tag">Gumroad cover <span>1280 × 720 px · 16:9</span></p>
+      <div data-art data-units="px" class="sheet cover"
+           data-spec="Canvas — Gumroad cover" data-kind="Product image · 16:9"
+           data-fill="Linear gradient 160° — #EADBD6 0% → #EADBD6 46% → #C9ADA7 100%"
+           data-size2="1280 × 720 px" data-pos="x 0 · y 0" data-layer="Layer 1"
+           data-effect="Three-stop linear gradient"
+           data-canva="Create → Custom size → 1280 × 720 px. Background → Gradient → linear 160°, Champagne, Champagne, Pale Dogwood."
+           data-edit="Flatten to solid #EADBD6 if you prefer no gradient at all."
+           data-note="1280 × 720 is Gumroad's recommended cover. It is also the shape of a YouTube thumbnail, so <b>one file covers the product page and the walkthrough video</b> if you want it to.">
+        <div class="bleed-frame"></div>
+        <div class="sh" style="inset:0;background:linear-gradient(160deg,#EADBD6 0%,#EADBD6 46%,#C9ADA7 100%)"></div>
+        <div class="sh arch" style="right:calc(-60 * var(--pt));top:calc(-90 * var(--pt));width:calc(560 * var(--pt));height:calc(900 * var(--pt));background:#9A8C98;opacity:.30"
+             data-spec="Rose arch" data-kind="Shape · arch, off two edges"
+             data-fill="#9A8C98 Rose quartz at 30%" data-size2="560 × 900 px"
+             data-pos="right −60 px · top −90 px" data-opacity="30%" data-layer="Layer 2"
+             data-canva="Rectangle with the top corners fully rounded, Rose quartz, Transparency 70."
+             data-edit="Move it behind the screenshot so the phone sits on colour."
+             data-note="It runs off <b>three edges at once</b>. A shape that touches nothing looks placed; a shape that leaves the canvas looks like part of something larger."></div>
+        <div class="sh" style="left:calc(760 * var(--pt));top:calc(126 * var(--pt));width:calc(280 * var(--pt));height:calc(220 * var(--pt));border-radius:50%;background:#97A2A6;opacity:.28;filter:blur(calc(40 * var(--pt)))"
+             data-spec="Cadet bloom" data-kind="Shape · blurred circle"
+             data-fill="#97A2A6 Cadet gray at 28%" data-size2="280 × 220 px · 40 px blur"
+             data-pos="x 760 px · y 126 px" data-opacity="28%" data-layer="Layer 3"
+             data-effect="40 px Gaussian blur"
+             data-canva="Circle → fill Cadet gray → Transparency 72 → Effects → Blur."
+             data-edit="Delete, or move it behind the device so the screen glows."
+             data-note="The only cool colour in the palette, used once, at low strength, behind the device. <b>A single cool note stops a warm palette going flat</b> — but two would start an argument."></div>
+
+        <div class="at" style="left:calc(72 * var(--pt));top:calc(66 * var(--pt));display:flex;align-items:center;gap:calc(16 * var(--pt))">
+          <div class="t-mark" style="width:calc(46 * var(--pt));height:calc(46 * var(--pt));border-radius:calc(3 * var(--pt))"><span style="font-size:calc(23 * var(--pt))">₱</span></div>
+          <p class="c-word">Money Tracker</p>
+        </div>
+
+        <h1 class="at c-title" style="left:calc(72 * var(--pt));width:calc(660 * var(--pt));top:calc(176 * var(--pt))"
+            data-spec="Cover headline" data-kind="Primary text · hierarchy 1"
+            data-font="Cormorant Garamond  (Canva free)" data-size="74 px"
+            data-weight="Regular 400" data-style="Normal" data-case="Sentence case"
+            data-track="0.005 em · Canva: 5" data-lh="1.02" data-align="Left"
+            data-color="#3E3239 — Ink" data-pos="x 72 px · y 176 px · 660 px measure" data-layer="Layer 4"
+            data-edit="Two lines maximum. Say what it is, not how it feels."
+            data-note="A cover headline is read at <b>about 300 px wide</b> in a Gumroad grid, which is a quarter of this size. Set it, then shrink the whole board to 25% and see if the first line still lands. If it does not, cut words — never shrink anything else to make room.">Every peso,<br>where you put it.</h1>
+
+        <p class="at c-sub" style="left:calc(72 * var(--pt));width:calc(660 * var(--pt));top:calc(376 * var(--pt))">
+          A private budget tracker for two wallets. Runs in your browser, keeps every record on your
+          device, and works offline.</p>
+
+        <div class="at" style="left:calc(72 * var(--pt));top:calc(492 * var(--pt));display:flex;gap:calc(12 * var(--pt));flex-wrap:wrap;width:calc(620 * var(--pt))"
+             data-spec="Feature chips" data-kind="Component · ×5 outlined pills"
+             data-fill="None" data-stroke="#C9ADA7 Pale Dogwood · 1 px"
+             data-size2="Auto width · 6 / 11 px padding · 12 px gaps"
+             data-pos="x 72 px · y 492 px" data-layer="Layer 4"
+             data-canva="Rounded rectangle, no fill, 1 px border, a 5 px Beaver dot and the label inside. Build one and duplicate."
+             data-edit="Five chips, one word or two each. Six starts to look like a spec sheet."
+             data-note="Chips are the fastest way to answer <b>“what does it actually do”</b> without a paragraph. Pick the five a buyer would search for, not the five you are proudest of.">
+          <span class="chip"><b></b>Two wallets</span>
+          <span class="chip"><b></b>Loans</span>
+          <span class="chip"><b></b>Savings goals</span>
+          <span class="chip"><b></b>Charts</span>
+          <span class="chip"><b></b>PIN lock</span>
+        </div>
+
+        <p class="at c-kicker" style="left:calc(72 * var(--pt));top:calc(596 * var(--pt))">Works offline · Phone, tablet &amp; desktop</p>
+
+        <div class="img-slot at" style="left:calc(830 * var(--pt));top:calc(96 * var(--pt));width:calc(300 * var(--pt));height:calc(560 * var(--pt));border-radius:calc(28 * var(--pt));border-color:#9A8C98;background:rgba(154,140,152,.10)"
+             data-spec="Device screenshot slot" data-kind="Image placeholder · portrait phone"
+             data-size2="300 × 560 px · 28 px corner radius"
+             data-pos="x 830 px · y 96 px" data-layer="Layer 5"
+             data-stroke="#9A8C98 Rose quartz · dashed while empty"
+             data-canva="Elements → Frames → pick the phone or rounded-rectangle frame → drag your screenshot onto it. Take the screenshot on a phone-width window so nothing has to be squashed."
+             data-edit="Use a screenshot with real-looking numbers, not zeros. An empty tracker sells nothing."
+             data-note="<b>Show the product, not a mood board.</b> The single biggest lift on a Gumroad cover is a real screen with real figures in it — buyers are trying to picture their own money in there, and an empty state makes that impossible."><div><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#9A8C98" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2.5"></rect><path d="M10 5.5h4"></path></svg><div class="t1">Screenshot</div><div class="t2">300 × 560 px</div></div></div>
+        <div class="sh grain"></div>
+        <div class="guide guide-safe"></div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <p class="board-tag">Thumbnail <span>600 × 600 px · square</span></p>
+      <div data-art data-units="px" class="sheet thumb"
+           data-spec="Canvas — Gumroad thumbnail" data-kind="Product image · square"
+           data-fill="#EADBD6 — Champagne pink" data-size2="600 × 600 px" data-pos="x 0 · y 0" data-layer="Layer 1"
+           data-canva="Create → Custom size → 600 × 600 px. Background #EADBD6."
+           data-edit="600 × 600 is Gumroad's minimum for a square thumbnail. Do not go smaller."
+           data-note="This is the image that appears at <b>roughly 120 px</b> in a library grid and on a shared link. Everything on it is sized so it survives that. If you can read the two lines at 20% zoom, it works.">
+        <div class="bleed-frame"></div>
+        <div class="sh" style="left:0;right:0;bottom:0;height:calc(196 * var(--pt));background:#9A8C98"
+             data-spec="Base band" data-kind="Shape · rectangle"
+             data-fill="#9A8C98 Rose quartz" data-size2="600 × 196 px · full bleed"
+             data-pos="x 0 · y 404 px" data-layer="Layer 2"
+             data-effect="None"
+             data-canva="Rectangle pinned to the bottom, wider than the canvas."
+             data-edit="Recolour to Beaver #AC7E6E for more weight, or delete it and let the square be one flat colour."
+             data-note="A band across the bottom third gives the square a <b>horizon</b>, which is what stops a thumbnail looking like a cropped fragment of something bigger. It also gives the descriptor line somewhere to sit that is not the same colour as the title."></div>
+        <div class="sh arch" style="left:calc(-70 * var(--pt));top:calc(-110 * var(--pt));width:calc(300 * var(--pt));height:calc(430 * var(--pt));background:#C9ADA7;opacity:.5"></div>
+
+        <div class="at" style="left:calc(60 * var(--pt));top:calc(64 * var(--pt));display:flex;align-items:center;gap:calc(13 * var(--pt))">
+          <div class="t-mark" style="width:calc(40 * var(--pt));height:calc(40 * var(--pt));border-radius:calc(3 * var(--pt));background:var(--taupe)"><span style="font-size:calc(20 * var(--pt))">₱</span></div>
+          <p class="th-word">Money Tracker</p>
+        </div>
+
+        <h1 class="at th-title" style="left:calc(60 * var(--pt));width:calc(480 * var(--pt));top:calc(174 * var(--pt))"
+            data-spec="Thumbnail headline" data-kind="Primary text · hierarchy 1"
+            data-font="Cormorant Garamond  (Canva free)" data-size="66 px"
+            data-weight="Regular 400" data-style="Normal" data-case="Sentence case"
+            data-track="0.005 em · Canva: 5" data-lh="1" data-align="Left"
+            data-color="#3E3239 — Ink" data-pos="x 60 px · y 174 px" data-layer="Layer 4"
+            data-edit="Two short lines. Three is one too many at this size."
+            data-note="66 px on a 600 px square is <b>11% of the canvas height per line</b> — about the smallest that still reads when the thumbnail is scaled to 120 px. Anything under 50 px here disappears entirely.">Every peso,<br>tracked.</h1>
+
+        <p class="at th-sub" style="left:calc(60 * var(--pt));width:calc(470 * var(--pt));top:calc(448 * var(--pt));color:#EADBD6">
+          Private · Offline · Two wallets, loans, goals and charts</p>
+        <div class="sh grain"></div>
+        <div class="guide guide-safe"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 03 · THE COPY ==================== -->
+  <div class="section-head">
+    <div class="n">03</div>
+    <div><h2>Listing copy</h2><p>Paste these straight into Gumroad. The short summary goes in the field under the
+      price; the description is the long body; the details block goes at the bottom where buyers look for the
+      answer to "will this work for me".</p></div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="panels" style="margin-top:8px;grid-template-columns:1fr">
+    <div class="panel" style="padding:0;border:0;background:transparent">
+
+      <div class="copyblock">
+        <h4>Product name</h4>
+        <p class="cnt">Two options — pick the second if you sell to a Philippine audience</p>
+<pre>Money Tracker — Private Offline Budget Tracker
+
+Money Tracker — Budget &amp; Expense Tracker for Bank + Cash (Works Offline)</pre>
+      </div>
+
+      <div class="copyblock">
+        <h4>Short summary</h4>
+        <p class="cnt">The one-liner under the price · 148 characters</p>
+<pre>A private budget tracker for two wallets — bank and cash. Runs in your browser, works with no internet, and keeps every record on your device.</pre>
+      </div>
+
+      <div class="copyblock">
+        <h4>Description</h4>
+        <p class="cnt">The long body of the listing</p>
+<pre><b>Your money, on one page. Nobody else's servers.</b>
+
+Most budget apps ask you to sign up, hand over your bank login, and trust a company you have never met with the most private numbers you own. This one does not. It opens in your browser, saves everything on your own device, and works whether or not you have signal.
+
+<b>Built for how people actually keep money.</b>
+Two wallets, side by side — one for the money in your bank or e-wallet, one for the cash physically in your pocket. Rename them to match your life: GCash, Savings, Payroll, Baon. Move money between them and it is never counted twice, never mistaken for spending.
+
+<b>A budget you build, not one you guess at.</b>
+Your monthly budget is not a number you type in — it is the sum of every deposit you record. Add your pay, add the side income, and the total is simply the truth. Split it into categories with their own monthly amounts, tick "use this amount every month", and the whole thing rebuilds itself on payday. Set your budget month to start on the 15th, or the 30th, or whenever you actually get paid.
+
+<b>Loans that remind you before you forget.</b>
+Add the loan, the lender, the total, and the day of the month it is due. The tracker watches that date for you: quiet while it is far off, a reminder on the day, a warning when it is late, and green the moment you log a payment. When the payments add up to the total, it marks itself Paid.
+
+<b>Savings goals that stop you spending them.</b>
+Name what you are saving for, put money aside, and that amount stops counting as money you can still spend — so nothing gets promised twice.
+
+<b>Reports you can actually read.</b>
+Search every record you have ever logged. See money out, money in and the net for any month or any range. Four charts of the same records: spending by category, money in against money out, the trend across months, and where it all went. Export transactions, category budgets or a monthly summary as CSV, or print the monthly report as a PDF to send to whoever needs it.
+
+<b>Private, and locked if you want it.</b>
+Set a four-digit PIN and the tracker locks itself after a few minutes of sitting idle. Nothing is uploaded, nothing is analysed, nothing is sold. There is no account to create because there is no server to create it on.
+
+<b>Yours to keep, and to make your own.</b>
+Change the title, the subtitle, the logo and the whole colour scheme from one colour. Light and dark are worked out for you. Add your own background image and dial its strength down until it is exactly as quiet as you want.
+
+<b>Install it like an app.</b>
+Add it to your home screen on a phone or tablet and it opens full-screen with no address bar, offline, in about a second. It also runs happily in any modern browser on a laptop.
+
+<b>What you get</b>
+· The complete tracker — one folder, ready to open
+· An illustrated user manual built into the app itself
+· A walkthrough video, start to finish
+· Free updates
+· Lifetime use — no subscription, no renewal, nothing to cancel</pre>
+      </div>
+
+      <div class="copyblock">
+        <h4>Additional details</h4>
+        <p class="cnt">The block near the bottom — this is where hesitation gets answered</p>
+<pre><b>Watch it work before you buy</b>
+The full walkthrough is public — setting a budget, logging spending, loans, savings goals and reports, start to finish in about eight minutes:
+▸ [youtu.be/your-video-id]
+
+You do not need to buy anything to watch it. If it is not what you need, you have spent eight minutes instead of your money. The same video is linked again in your receipt, so you will always have it.
+
+<b>How it works</b>
+It is a web app you open in your browser. There is no installer and no account. Open it once and your device keeps a copy, so it works with no internet from then on. On a phone or tablet you can add it to your home screen and it behaves like any other app.
+
+<b>Where your data lives</b>
+On your device, in your browser's own storage. It never leaves. That is the point — and it is also the one thing you have to take seriously: <b>you are the only backup.</b> The tracker exports a single backup file in one tap. Take one on day one and one a month after that, and you are safe. Clearing your browser data, using a private window, or switching to a new phone without a backup will lose your entries.
+
+<b>Works on</b>
+Chrome, Edge, Safari, Firefox and Samsung Internet — Android, iPhone, iPad, Windows and Mac. Anything from roughly 2020 onward.
+
+<b>Currency</b>
+Set to ₱ out of the box, changeable to any symbol you like in one field.
+
+<b>What it is not</b>
+It does not connect to your bank, import statements, or read your texts. Everything is entered by you, which is exactly why nothing about your money ever leaves the device.
+
+<b>Licence</b>
+One purchase, one household, unlimited devices. Use it for as long as you like. Please do not resell or redistribute the files.
+
+<b>Refunds</b>
+If it does not work on your device, message me within 14 days and I will refund you in full — no explanation needed.
+
+<b>Support</b>
+[hello@yourdomain.com] — I answer within two working days.</pre>
+      </div>
+
+      <div class="copyblock">
+        <h4>Receipt email</h4>
+        <p class="cnt">Gumroad's "content" / thank-you message — keep it shorter than the PDF</p>
+<pre>Subject: Your Money Tracker is ready
+
+Thank you — everything is set up and waiting for you.
+
+▸ Open your tracker: [yourdomain.com/tracker]
+▸ Watch the 8-minute walkthrough: [youtu.be/your-video-id]
+
+Four things to do first:
+1. Rename your two wallets to match how you actually keep money.
+2. Add your pay under "Add Money" — your budget builds itself from what you deposit.
+3. Create your categories and give each a monthly amount.
+4. Take one backup: Data → Backup &amp; Restore → Download.
+
+One thing to read: your records live on your device only. Nobody else can see them — and nobody else can recover them. Take that first backup today and keep it somewhere safe.
+
+Any trouble at all, just reply to this email.
+
+[Your name]</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="panels" style="margin-top:10px">
+    <div class="panel">
+      <h3>Build notes</h3>
+      <ul class="ticks">
+        <li><b>Thank-you page</b> — Custom size 210 × 297 mm. Canva shows points; every size in its specs is points.</li>
+        <li><b>Cover</b> — Custom size 1280 × 720 px. Every size in its specs is pixels.</li>
+        <li><b>Thumbnail</b> — Custom size 600 × 600 px. Same, pixels.</li>
+        <li>Export the A4 as <b>PDF Standard</b> and the two images as <b>PNG</b>.</li>
+        <li>Cormorant Garamond and Montserrat are both free in Canva. If Cormorant is missing on your account, EB Garamond or Playfair Display drop in cleanly.</li>
+      </ul>
+      <p class="pnote">Check the cover and the thumbnail at <b>25% zoom</b> before you upload. That is roughly how big they are in a Gumroad grid.</p>
+    </div>
+
+    <div class="panel">
+      <h3>The palette, and the ink</h3>
+      <dl>
+        <div><dt>Cadet gray</dt><dd>#97A2A6 — one cool accent</dd></div>
+        <div><dt>Rose quartz</dt><dd>#9A8C98 — bands, marks</dd></div>
+        <div><dt>Champagne pink</dt><dd>#EADBD6 — the ground</dd></div>
+        <div><dt>Pale Dogwood</dt><dd>#C9ADA7 — arches, rules</dd></div>
+        <div><dt>Beaver</dt><dd>#AC7E6E — rules, numerals</dd></div>
+        <div><dt>Ink (added)</dt><dd>#3E3239 — every word</dd></div>
+      </dl>
+      <p class="pnote">Beaver on Champagne pink is <b>2.5:1</b>. Body text needs <b>4.5:1</b>. That is the whole reason the ink exists — swap it for any dark you like.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Before you publish</h3>
+      <ul class="ticks">
+        <li>Replace every bracket on the A4 — there are seven.</li>
+        <li>Put the tracker link and the video link in <b>three</b> places — the Additional details block, the receipt email and the PDF. People lose one of them.</li>
+        <li>Take the cover screenshot with <b>real-looking numbers</b>, never an empty tracker.</li>
+        <li>Record the walkthrough before you list. It is the single thing that answers the most questions.</li>
+      </ul>
+      <ul class="ticks warn" style="margin-top:12px">
+        <li>Do not soften the backup warning. A lost month of records is the one thing that turns a happy buyer into a refund.</li>
+        <li>Do not claim bank syncing or automatic import. It does neither, and saying so is a selling point, not a gap.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="kitfoot">
+    <div>Money Tracker · <b>Thank-you page &amp; Gumroad artwork</b> · A4 in points, product images in pixels</div>
+    <div>Copy blocks above are ready to paste</div>
+  </footer>
+</div>
+
+<div class="copied">copied</div>
+<script src="../TEST/va-kit/brand.js?v=24"></script>
+</body>
+</html>
