@@ -702,22 +702,14 @@ function setBaseBudget(cat, period, amount) {
    out, so they stay in Total Spent and the account balance. It simply stops
    showing, and from the month it was deleted it holds no budget. */
 function liveCats() { return state.categories.filter(c => !c.archived) }
-/* What was left unspent last month rolls into this one, automatically.
-   Walks forward from the category's first month, so a rolled-over balance
-   itself rolls on if it too goes unused. Overspending never carries as debt. */
+/* Only last month's leftover rolls into this one: its own allowance minus
+   what was spent in it. Older months do not pile on. Overspending never
+   carries as debt. */
 function carriedIn(cat, period) {
     const key = period || activePeriod;
-    const spentBy = {};
-    (cat.expenses || []).forEach(e => { const p = periodOf(e); spentBy[p] = (spentBy[p] || 0) + Number(e.amount) });
-    const keys = Object.keys(spentBy).concat(Object.keys(cat.periods || {})).filter(k => k !== '0000-00');
-    if (!keys.length) return 0;
-    let p = keys.reduce((a, b) => a < b ? a : b), carry = 0;
     if (cat.archived && cat.archivedPeriod && key > cat.archivedPeriod) return 0;
-    while (p < key) {
-        carry = Math.max(0, baseBudget(cat, p) + carry - (spentBy[p] || 0));
-        p = shiftPeriod(p, 1);
-    }
-    return carry;
+    const prev = shiftPeriod(key, -1);
+    return Math.max(0, baseBudget(cat, prev) - catSpent(cat, prev));
 }
 function catBudget(cat, period) {
     const key = period || activePeriod;
