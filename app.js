@@ -4211,13 +4211,18 @@ function gripKey(ev, id) {
     if (grip) { grip.focus(); grip.scrollIntoView({ block: 'nearest' }) }
 }
 
-/* ── drag ── */
+/* ── drag ──
+   The card being dragged is never moved in the DOM while the finger is down:
+   on a phone, re-parenting the element that holds the touch makes the browser
+   drop the gesture, so the release never arrives and the ghost hangs. Instead
+   a thin marker shows where it will land, and the real reorder happens once,
+   on release. */
 let dragState = null;
 function catCards() { return Array.from(document.querySelectorAll('#categoriesList .cat-card')) }
 
 function dragStart(ev) {
     const grip = ev.target.closest('[data-grip]');
-    if (!grip || ev.button > 0) return;
+    if (!grip || ev.button > 0 || dragState) return;
     if (catSort() !== 'custom') { showToast('Switch to “My order” to arrange them yourself'); return }
 
     const card = grip.closest('.cat-card'); if (!card) return;
@@ -4228,70 +4233,93 @@ function dragStart(ev) {
        follows the pointer is a short copy of its header only */
     const ghost = card.cloneNode(true);
     ghost.classList.add('cat-ghost');
+    ghost.removeAttribute('id');
+    ghost.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    ghost.querySelectorAll('[data-grip],[data-cat]').forEach(n => { n.removeAttribute('data-grip'); n.removeAttribute('data-cat') });
+    ghost.removeAttribute('data-cat');
     ghost.style.width = rect.width + 'px';
     ghost.style.left = rect.left + 'px';
     ghost.style.top = rect.top + 'px';
     const body = ghost.querySelector('.cat-body'); if (body) body.remove();
     document.body.appendChild(ghost);
 
+    const marker = document.createElement('div');
+    marker.className = 'cat-drop-marker';
+    card.parentNode.insertBefore(marker, card.nextSibling);
+
     card.classList.add('cat-dragging');
     document.body.classList.add('cat-reordering');
 
     dragState = {
-        id: card.dataset.cat, card, ghost,
+        id: card.dataset.cat, card, ghost, marker, grip,
         offsetY: ev.clientY - rect.top,
-        pointerId: ev.pointerId
+        pointerId: ev.pointerId,
+        y: ev.clientY, raf: 0
     };
-    grip.setPointerCapture(ev.pointerId);
+    try { grip.setPointerCapture(ev.pointerId) } catch (e) { }
     grip.addEventListener('pointermove', dragMove);
     grip.addEventListener('pointerup', dragEnd);
     grip.addEventListener('pointercancel', dragEnd);
+    grip.addEventListener('lostpointercapture', dragEnd);
+    dragState.raf = requestAnimationFrame(dragScrollTick);
+}
+/* where would the card land if let go at this height */
+function dragPlace() {
+    const d = dragState; if (!d) return;
+    d.ghost.style.top = (d.y - d.offsetY) + 'px';
+    const list = document.getElementById('categoriesList');
+    const others = catCards().filter(c => c !== d.card);
+    let before = null;
+    for (const c of others) {
+        const r = c.getBoundingClientRect();
+        if (d.y < r.top + r.height / 2) { before = c; break }
+    }
+    if (before) { if (d.marker.nextElementSibling !== before) list.insertBefore(d.marker, before) }
+    else if (list.lastElementChild !== d.marker) list.appendChild(d.marker);
 }
 function dragMove(ev) {
     if (!dragState) return;
     ev.preventDefault();
-    const g = dragState.ghost;
-    g.style.top = (ev.clientY - dragState.offsetY) + 'px';
-
-    /* drop where the pointer is: the first card whose middle is below it */
-    const others = catCards().filter(c => c !== dragState.card);
-    let before = null;
-    for (const c of others) {
-        const r = c.getBoundingClientRect();
-        if (ev.clientY < r.top + r.height / 2) { before = c; break }
-    }
-    const list = document.getElementById('categoriesList');
-    if (before) { if (dragState.card.nextElementSibling !== before) list.insertBefore(dragState.card, before) }
-    else if (list.lastElementChild !== dragState.card) list.appendChild(dragState.card);
-
-    /* keep the list scrolling when the drag reaches an edge */
-    const margin = 70;
-    if (ev.clientY < margin) window.scrollBy(0, -12);
-    else if (ev.clientY > window.innerHeight - margin) window.scrollBy(0, 12);
+    dragState.y = ev.clientY;
+    dragPlace();
+}
+/* keeps scrolling while the finger rests near an edge, even without movement */
+function dragScrollTick() {
+    const d = dragState; if (!d) return;
+    const margin = 80;
+    let dy = 0;
+    if (d.y < margin) dy = -Math.ceil((margin - d.y) / 6);
+    else if (d.y > window.innerHeight - margin) dy = Math.ceil((d.y - (window.innerHeight - margin)) / 6);
+    if (dy) { window.scrollBy(0, dy); dragPlace() }
+    d.raf = requestAnimationFrame(dragScrollTick);
 }
 function dragEnd(ev) {
     if (!dragState) return;
-    const { id, card, ghost } = dragState;
-    const grip = document.querySelector(`[data-grip="${id}"]`);
-    if (grip) {
-        grip.removeEventListener('pointermove', dragMove);
-        grip.removeEventListener('pointerup', dragEnd);
-        grip.removeEventListener('pointercancel', dragEnd);
-        try { grip.releasePointerCapture(dragState.pointerId) } catch (e) { }
-    }
+    const { id, card, ghost, marker, grip, raf } = dragState;
+    cancelAnimationFrame(raf);
+    dragState = null;
+    grip.removeEventListener('pointermove', dragMove);
+    grip.removeEventListener('pointerup', dragEnd);
+    grip.removeEventListener('pointercancel', dragEnd);
+    grip.removeEventListener('lostpointercapture', dragEnd);
+    try { grip.releasePointerCapture(ev && ev.pointerId) } catch (e) { }
     ghost.remove();
     card.classList.remove('cat-dragging');
     document.body.classList.remove('cat-reordering');
-    dragState = null;
 
-    /* the DOM is now in the order the user arranged; write it back */
-    const order = catCards().map(c => c.dataset.cat);
-    const moved = order.some((catId, i) => state.categories[i] && state.categories[i].id !== catId);
+    /* read the arrangement off the marker, then take it away */
+    const order = [];
+    Array.from(document.getElementById('categoriesList').children).forEach(n => {
+        if (n === marker) order.push(id);
+        else if (n !== card && n.dataset && n.dataset.cat) order.push(n.dataset.cat);
+    });
+    marker.remove();
+    const moved = order.some((catId, i) => liveCats()[i] && liveCats()[i].id !== catId);
     if (!moved) return;
     const pos = c => { const i = order.indexOf(c.id); return i < 0 ? Infinity : i };
     state.categories.sort((a, b) => pos(a) - pos(b));
     save(); render();
-    const grip2 = document.querySelector(`[data-grip="${id}"]`);
+    const grip2 = document.querySelector('[data-grip="' + id + '"]');
     if (grip2) grip2.focus();
     showToast('Order saved ✓');
 }

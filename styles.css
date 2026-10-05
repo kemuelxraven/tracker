@@ -5796,7 +5796,7 @@ body.modal-open {
 /* ── the grip ── */
 .cat-grip {
     flex-shrink: 0;
-    width: 26px;
+    width: 34px;
     align-self: stretch;
     margin: -16px 0 -11px -8px;
     border: none;
@@ -5828,6 +5828,14 @@ body.modal-open {
 .cat-card.cat-dragging {
     opacity: .35;
     border-style: dashed;
+}
+
+.cat-drop-marker {
+    height: 4px;
+    margin: -2px 12px;
+    border-radius: 4px;
+    background: var(--accent);
+    pointer-events: none;
 }
 
 .cat-card.cat-dragging .cat-body {
