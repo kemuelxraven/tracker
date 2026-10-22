@@ -689,10 +689,11 @@
                         category's allowance, exactly like any other spending.</li>
                     <li><strong>Excess money</strong> — whatever this account holds that your categories have not
                         claimed. This choice only appears when there actually is excess. No category is touched;
-                        the money simply leaves the account, and shows up in Add Money history marked
+                        the money stays in the account, and shows up in Add Money history marked
                         <span class="manual-key">Saved</span>, where you can take it back any time.</li>
                 </ul>
-                <p>Either way the money stops counting as money you can still spend, so nothing is counted twice.</p>
+                <p>Either way the money stays in your account balance — it is saved, not spent — but stops counting as
+                    money you can still spend, so nothing is counted twice.</p>
                 <ul>
                     <li>Each goal shows a progress bar, what is left, and one of
                         <span class="manual-key">On track</span>, <span class="manual-key">Behind</span>, <span class="manual-key">Date has passed</span> or <span class="manual-key">Reached</span>.</li>
@@ -1113,9 +1114,9 @@
             <label>Date</label>
             <input type="date" id="goalAddDate">
             <p style="font-size:.72rem;color:var(--text-muted);margin:8px 0 0;line-height:1.55">Either way the money
-                stops counting as money you can still spend. From a category it is recorded as an expense against that
-                allowance; from your excess it simply leaves the account, and you can take it back any time from Add
-                Money.</p>
+                stays in your account balance and stops counting as money you can still spend. From a category it is
+                recorded as an expense against that allowance; from your excess it is simply marked as saved, and you
+                can take it back any time from Add Money.</p>
             <div class="modal-actions">
                 <button class="btn-modal-cancel" onclick="closeGoalAdd()">Cancel</button>
                 <button class="btn-modal-save" onclick="saveGoalAdd()">Put it aside</button>

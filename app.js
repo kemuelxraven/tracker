@@ -8,6 +8,20 @@ function cur() { return settings().currency || '₱' }
 function mask() { return cur() + '••••••' }
 function cycleStart() { const n = parseInt(settings().cycleStart); return isNaN(n) ? 1 : Math.min(28, Math.max(1, n)) }
 function blankAccount() { return { totalBudget: 0, categories: [], moneyIn: [], loans: [], goals: [] } }
+/* Money put into a savings goal used to be taken out of the account's total.
+   It now stays in the account, so records made under the old rule are put
+   right once, on read: the amount goes back in and the entry is marked
+   `held` so it is never counted a second time. A set-aside whose goal was
+   deleted really did leave, and stays out. */
+function releaseLegacySetAsides(list) {
+    let back = 0;
+    (list || []).forEach(e => {
+        if (!isSetAside(e) || e.held) return;
+        e.held = true;
+        if (e.goalId) back += Number(e.amount) || 0;
+    });
+    return back;
+}
 /* Reading is also where damaged rows are dropped. Reporting a bad row
    without removing it just moves the failure into the first render, so
    anything that cannot be used is left behind here and named in the
@@ -24,10 +38,11 @@ function normalizeAccount(a) {
         }));
     const usable = list => (Array.isArray(list) ? list : [])
         .filter(x => x && typeof x === 'object' && !isNaN(Number(x.amount)));
+    const moneyIn = usable(a.moneyIn);
     return {
-        totalBudget: Number(a.totalBudget) || 0,
+        totalBudget: (Number(a.totalBudget) || 0) + releaseLegacySetAsides(moneyIn),
         categories,
-        moneyIn: usable(a.moneyIn),
+        moneyIn,
         loans: (Array.isArray(a.loans) ? a.loans : []).filter(l => l && typeof l === 'object' && typeof l.name === 'string'),
         goals: (Array.isArray(a.goals) ? a.goals : []).filter(g => g && typeof g === 'object' && typeof g.name === 'string')
     };
@@ -842,7 +857,8 @@ function deleteMoneyIn(id) {
     if (isSetAside(entry)) {
         const goal = findGoalById(entry.goalId);
         if (!confirm(`Take back ${fmt(entry.amount)} set aside${goal ? ' for ' + goal.name : ''}? It goes back into your excess.`)) return;
-        state.totalBudget = (Number(state.totalBudget) || 0) + Number(entry.amount);
+        /* money still tied to a goal never left the account; an orphaned one did */
+        if (!entry.goalId) state.totalBudget = (Number(state.totalBudget) || 0) + Number(entry.amount);
         state.moneyIn = (state.moneyIn || []).filter(e => e.id !== id);
         save(); renderMoneyHistory(); renderBudgetCard(); renderGoalBadge();
         if (goalsIsOpen()) renderGoals();
@@ -1085,14 +1101,24 @@ let transferFrom = 'bank';
 function isTransfer(e) { return e && e.kind === 'transfer' }
 /* Money set aside into a savings goal straight from the excess — it never
    belonged to a category, so it is recorded here rather than as spending.
-   Like a transfer it leaves the account, so it lowers the total budget. */
+   It is only labelled as saved: it stays in the account, so it does not
+   touch the total budget — unless its goal was deleted, which turns it into
+   a plain outflow. */
 function isSetAside(e) { return !!e && e.kind === 'saving' }
+/* what this account is holding for its goals: `cat` was taken from category
+   allowances (recorded as expenses), `aside` came straight from the excess */
+function acctGoalHeld(a) {
+    let cat = 0, aside = 0;
+    (a.categories || []).forEach(c => (c.expenses || []).forEach(e => { if (e.goalId) cat += Number(e.amount) || 0 }));
+    (a.moneyIn || []).forEach(e => { if (isSetAside(e) && e.goalId) aside += Number(e.amount) || 0 });
+    return { cat, aside };
+}
 /* every moneyIn row that is really money leaving, whichever kind it is */
 function isOutflowEntry(e) { return isTransfer(e) || isSetAside(e) }
 function acctSpentAll(key) {
     return (store.accounts[key].categories || []).reduce((s, c) => s + (c.expenses || []).reduce((t, e) => t + Number(e.amount), 0), 0);
 }
-function acctBalance(key) { return (Number(store.accounts[key].totalBudget) || 0) - acctSpentAll(key) }
+function acctBalance(key) { return (Number(store.accounts[key].totalBudget) || 0) - acctSpentAll(key) + acctGoalHeld(store.accounts[key]).cat }
 function transferTo() { return transferFrom === 'bank' ? 'cash' : 'bank' }
 function setTransferDir(from) {
     transferFrom = from;
@@ -1183,8 +1209,8 @@ function saveEditMoney() {
             there.totalBudget = (Number(there.totalBudget) || 0) + (partner.dir === 'out' ? -delta : delta);
         }
     } else if (isSetAside(entry)) {
-        /* setting more aside takes more out of the account */
-        state.totalBudget = (Number(state.totalBudget) || 0) - delta;
+        /* setting more aside only moves money within the account, unless the goal is gone */
+        if (!entry.goalId) state.totalBudget = (Number(state.totalBudget) || 0) - delta;
     } else {
         state.totalBudget = Math.max(0, (Number(state.totalBudget) || 0) + delta);
     }
@@ -1716,8 +1742,10 @@ ${monthMoneyInTotal > 0 ? `<span class="report-total-chip" style="background:lin
 }
 
 function renderBudgetCard() {
-    const spent = totalSpentAll(); const bankRem = state.totalBudget - spent; const catRem = catTotalRem();
-    const diff = bankRem - catRem; const pct = state.totalBudget > 0 ? Math.min((spent / state.totalBudget) * 100, 100) : 0;
+    /* money saved toward a goal is still in the account, so it is neither spent nor missing from the balance */
+    const held = acctGoalHeld(state);
+    const spent = totalSpentAll() - held.cat; const bankRem = state.totalBudget - spent; const catRem = catTotalRem();
+    const diff = bankRem - catRem - held.cat - held.aside; const pct = state.totalBudget > 0 ? Math.min((spent / state.totalBudget) * 100, 100) : 0;
     document.getElementById('budgetDisplay').textContent = valuesHidden ? mask() : fmt(state.totalBudget);
     document.getElementById('totalSpent').textContent = valuesHidden ? mask() : fmt(spent);
     const remEl = document.getElementById('totalRemaining'); remEl.textContent = valuesHidden ? mask() : fmt(bankRem);
@@ -1906,7 +1934,7 @@ function confirmImport() {
 }
 function mergeInto(target, incoming) {
     if (!incoming) return;
-    target.totalBudget = (Number(target.totalBudget) || 0) + (Number(incoming.totalBudget) || 0);
+    target.totalBudget = (Number(target.totalBudget) || 0) + (Number(incoming.totalBudget) || 0) + releaseLegacySetAsides(incoming.moneyIn);
     if (!target.moneyIn) target.moneyIn = [];
     const existingMoneyIds = new Set(target.moneyIn.map(e => e.id));
     (incoming.moneyIn || []).forEach(e => { if (!existingMoneyIds.has(e.id)) target.moneyIn.push(e) });
@@ -3402,9 +3430,10 @@ function printReport() {
    A goal is a name, a target amount and — optionally — a date to
    have it by. Money is put aside by logging a real expense against
    a category and tagging it with goalId, the mirror of how a loan
-   payment works. That matters: money set aside genuinely leaves the
-   spendable balance, so it cannot be counted twice, and the entry
-   shows up in the logs, charts, reports and exports like any other.
+   payment works. That matters: money set aside stops counting as
+   spendable excess, so it cannot be counted twice, yet it stays in the
+   account balance — it is saved, not spent — and the entry shows up
+   in the logs, charts, reports and exports like any other.
    ════════════════════════════════════════════════════════════════ */
 
 let goalsFilter = 'open';       /* open | done | all */
@@ -3638,11 +3667,15 @@ function deleteGoal(id) {
     const g = findGoalById(id); if (!g) return;
     const contribs = goalDeposits(id);
     const msg = contribs.length
-        ? `Delete "${g.name}"? Its ${contribs.length} deposit${contribs.length === 1 ? '' : 's'} stay in your records — the money has already left the account — but will no longer be tied to a goal.`
+        ? `Delete "${g.name}"? Its ${contribs.length} deposit${contribs.length === 1 ? '' : 's'} stay in your records but will no longer be saved money — they will count as money that has left the account.`
         : `Delete "${g.name}"?`;
     if (!confirm(msg)) return;
     state.categories.forEach(cat => (cat.expenses || []).forEach(e => { if (e.goalId === id) delete e.goalId }));
-    (state.moneyIn || []).forEach(e => { if (isSetAside(e) && e.goalId === id) delete e.goalId });
+    (state.moneyIn || []).forEach(e => {
+        if (!isSetAside(e) || e.goalId !== id) return;
+        delete e.goalId;
+        state.totalBudget = (Number(state.totalBudget) || 0) - (Number(e.amount) || 0);
+    });
     state.goals = goalList().filter(x => x.id !== id);
     save(); render(); renderGoalBadge(); refreshGoalSelects();
     if (goalsIsOpen()) renderGoals();
@@ -3655,7 +3688,7 @@ function deleteGoal(id) {
    not claimed. The excess is only offered when there actually is some. */
 const GOAL_FROM_EXCESS = '__excess__';
 function accountExcess() {
-    return (Number(state.totalBudget) || 0) - totalSpentAll() - catTotalRem();
+    return (Number(state.totalBudget) || 0) - totalSpentAll() - catTotalRem() - acctGoalHeld(state).aside;
 }
 function goalCatOptions(selected) {
     const excess = accountExcess();
@@ -3699,15 +3732,14 @@ function saveGoalAdd() {
     if (!catId) { showToast('Choose where the money comes from'); return }
 
     if (catId === GOAL_FROM_EXCESS) {
-        /* Straight out of the excess: no category allowance is touched, so
-           the money leaves the account balance itself — the same shape as a
-           transfer out, and undone the same way from Add Money. */
+        /* Straight out of the excess: no category allowance is touched and
+           the money stays in the account — it is only labelled as saved, so
+           the balance is unchanged. Undone from Add Money. */
         if (!state.moneyIn) state.moneyIn = [];
         state.moneyIn.unshift({
-            id: uid(), note, amount, kind: 'saving', dir: 'out', goalId: g.id,
+            id: uid(), note, amount, kind: 'saving', dir: 'out', goalId: g.id, held: true,
             date: isoToLabel(dateISO), dateRaw: dateISO, loggedAt: Date.now()
         });
-        state.totalBudget = (Number(state.totalBudget) || 0) - amount;
     } else {
         const cat = state.categories.find(c => c.id === catId);
         if (!cat) { showToast('Pick where the money comes from'); return }
