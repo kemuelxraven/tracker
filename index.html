@@ -164,6 +164,8 @@
             <button class="btn-logs" onclick="openLogs()">Logs</button>
             <button class="btn-logs" onclick="openCharts()">Charts</button>
             <button class="btn-report" onclick="openReport()">Reports</button>
+            <button class="btn-logs" id="btnCalc" onclick="openCalc()">Calculator</button>
+            <button class="btn-logs" id="btnNotes" onclick="openNotes()">Notes</button>
         </div>
 
         <div class="period-wrap">
@@ -1340,6 +1342,76 @@
             <div class="modal-actions">
                 <button class="btn-modal-cancel" onclick="closeEditExpModal()">Cancel</button>
                 <button class="btn-modal-save" onclick="saveEditExp()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calculator Modal -->
+    <div class="modal-overlay" id="calcModal">
+        <div class="modal calc-modal">
+            <div class="calc-head">
+                <h3>Calculator</h3>
+                <button class="calc-close" onclick="closeCalc()" aria-label="Close calculator">✕</button>
+            </div>
+            <div class="calc-display" aria-live="polite">
+                <div class="calc-expr" id="calcExpr">&nbsp;</div>
+                <div class="calc-result" id="calcResult">0</div>
+            </div>
+            <div class="calc-keys">
+                <button class="calc-key fn" onclick="calcPress('C')">C</button>
+                <button class="calc-key fn" onclick="calcPress('back')" aria-label="Backspace">⌫</button>
+                <button class="calc-key fn" onclick="calcPress('%')">%</button>
+                <button class="calc-key op" onclick="calcPress('/')" aria-label="Divide">÷</button>
+                <button class="calc-key" onclick="calcPress('7')">7</button>
+                <button class="calc-key" onclick="calcPress('8')">8</button>
+                <button class="calc-key" onclick="calcPress('9')">9</button>
+                <button class="calc-key op" onclick="calcPress('*')" aria-label="Multiply">×</button>
+                <button class="calc-key" onclick="calcPress('4')">4</button>
+                <button class="calc-key" onclick="calcPress('5')">5</button>
+                <button class="calc-key" onclick="calcPress('6')">6</button>
+                <button class="calc-key op" onclick="calcPress('-')" aria-label="Subtract">−</button>
+                <button class="calc-key" onclick="calcPress('1')">1</button>
+                <button class="calc-key" onclick="calcPress('2')">2</button>
+                <button class="calc-key" onclick="calcPress('3')">3</button>
+                <button class="calc-key op" onclick="calcPress('+')" aria-label="Add">+</button>
+                <button class="calc-key fn" onclick="calcPress('neg')" aria-label="Change sign">±</button>
+                <button class="calc-key" onclick="calcPress('0')">0</button>
+                <button class="calc-key" onclick="calcPress('.')">.</button>
+                <button class="calc-key eq" onclick="calcPress('=')" aria-label="Equals">=</button>
+            </div>
+            <div class="calc-foot">
+                <button class="calc-copy" onclick="calcCopy()">Copy result</button>
+                <span class="calc-hint">Your keyboard works too</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Modal -->
+    <div class="modal-overlay" id="notesModal">
+        <div class="modal notes-modal">
+            <div class="notes-head">
+                <button class="notes-back" id="notesBack" onclick="notesShowList()" aria-label="Back to all notes">‹ All notes</button>
+                <h3 id="notesTitle">Notes</h3>
+                <div class="notes-head-btns">
+                    <button class="notes-new" id="notesNewBtn" onclick="newNote()">＋ New note</button>
+                    <button class="calc-close" onclick="closeNotes()" aria-label="Close notes">✕</button>
+                </div>
+            </div>
+
+            <div id="notesListView">
+                <input type="search" id="notesSearch" class="notes-search" placeholder="Search notes"
+                    oninput="renderNotesList()" aria-label="Search notes">
+                <div class="notes-list" id="notesList"></div>
+            </div>
+
+            <div id="notesEditView" class="notes-edit" hidden>
+                <textarea id="noteText" class="note-text" maxlength="20000"
+                    placeholder="Start typing… the first line becomes the title." oninput="noteTyped()"
+                    aria-label="Note text"></textarea>
+                <div class="notes-foot">
+                    <span class="notes-status" id="noteStatus"></span>
+                    <button class="notes-delete" onclick="deleteCurrentNote()">Delete</button>
+                </div>
             </div>
         </div>
     </div>

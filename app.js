@@ -144,7 +144,8 @@ function adoptStore(data, keepSettings) {
             bgMode: ['default', 'custom', 'none'].indexOf(inSet.bgMode) >= 0 ? inSet.bgMode : 'default',
             bgOpacity: inSet.bgOpacity === undefined ? 100 : Math.max(0, Math.min(100, parseInt(inSet.bgOpacity) || 0))
         },
-        accounts: { bank: normalizeAccount(accts.bank), cash: normalizeAccount(accts.cash) }
+        accounts: { bank: normalizeAccount(accts.bank), cash: normalizeAccount(accts.cash) },
+        notes: normalizeNotes(data && data.notes)
     };
     Object.values(store.accounts).forEach(a => (a.loans || []).forEach(l => {
         if (!l.dueDay && l.dueRaw) l.dueDay = parseInt(String(l.dueRaw).slice(8, 10));
@@ -1612,6 +1613,359 @@ function openReport() {
     document.getElementById('reportModal').classList.add('open');
 }
 function closeReport() { document.getElementById('reportModal').classList.remove('open') }
+/* ════════════════════════════════════════════════════════════════
+   NOTES
+
+   Free-form notes, shared by the Bank and Cash tabs. They live in
+   store.notes, so they are saved with everything else, travel in
+   backups, and sit behind the PIN lock like the rest of the data.
+   Typing saves on its own after a short pause; an empty note is
+   dropped when you leave it.
+   ════════════════════════════════════════════════════════════════ */
+let editingNoteId = null;
+let noteSaveTimer = null;
+
+function normalizeNotes(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+        .filter(n => n && typeof n === 'object' && typeof n.text === 'string')
+        .map(n => ({
+            id: String(n.id || uid()),
+            text: n.text,
+            createdAt: n.createdAt || n.updatedAt || new Date().toISOString(),
+            updatedAt: n.updatedAt || n.createdAt || new Date().toISOString()
+        }));
+}
+function notesList() {
+    if (!Array.isArray(store.notes)) store.notes = [];
+    return store.notes;
+}
+function noteTitle(n) {
+    const first = n.text.split('\n').find(l => l.trim()) || '';
+    return first.trim().slice(0, 80) || 'Untitled note';
+}
+function notePreview(n) {
+    const lines = n.text.split('\n').filter(l => l.trim());
+    return lines.slice(1).join(' ').trim().slice(0, 140);
+}
+function noteWhen(iso) {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    const sameDay = localISODate(d) === localISODate(new Date());
+    return sameDay
+        ? 'Today, ' + d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
+        : d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function openNotes() {
+    notesShowList();
+    document.getElementById('notesSearch').value = '';
+    renderNotesList();
+    document.getElementById('notesModal').classList.add('open');
+}
+function closeNotes() {
+    leaveCurrentNote();
+    document.getElementById('notesModal').classList.remove('open');
+}
+
+function renderNotesList() {
+    const box = document.getElementById('notesList'); if (!box) return;
+    const q = document.getElementById('notesSearch').value.trim().toLowerCase();
+    const all = notesList().slice().sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    const shown = q ? all.filter(n => n.text.toLowerCase().includes(q)) : all;
+    if (!all.length) {
+        box.innerHTML = '<div class="notes-empty">No notes yet.<br>Tap <strong>＋ New note</strong> to write one.</div>';
+        return;
+    }
+    if (!shown.length) { box.innerHTML = '<div class="notes-empty">No notes match your search.</div>'; return }
+    box.innerHTML = shown.map(n => {
+        const prev = notePreview(n);
+        return `<button class="note-card" data-id="${vizEsc(n.id)}" onclick="openNote(this.dataset.id)">
+            <span class="note-card-title">${vizEsc(noteTitle(n))}</span>
+            ${prev ? `<span class="note-card-preview">${vizEsc(prev)}</span>` : ''}
+            <span class="note-card-date">${vizEsc(noteWhen(n.updatedAt))}</span>
+        </button>`;
+    }).join('');
+}
+
+function notesShowList() {
+    leaveCurrentNote();
+    document.getElementById('notesListView').hidden = false;
+    document.getElementById('notesEditView').hidden = true;
+    document.getElementById('notesBack').hidden = true;
+    document.getElementById('notesTitle').hidden = false;
+    document.getElementById('notesNewBtn').hidden = false;
+    renderNotesList();
+}
+function notesShowEditor() {
+    document.getElementById('notesListView').hidden = true;
+    document.getElementById('notesEditView').hidden = false;
+    document.getElementById('notesBack').hidden = false;
+    document.getElementById('notesTitle').hidden = true;
+    document.getElementById('notesNewBtn').hidden = true;
+}
+
+function newNote() {
+    leaveCurrentNote();
+    const now = new Date().toISOString();
+    const note = { id: uid(), text: '', createdAt: now, updatedAt: now };
+    notesList().push(note);
+    openNote(note.id);
+}
+function openNote(id) {
+    const note = notesList().find(n => n.id === id); if (!note) return;
+    editingNoteId = id;
+    notesShowEditor();
+    const ta = document.getElementById('noteText');
+    ta.value = note.text;
+    renderNoteStatus(note, false);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length) }, 60);
+}
+function renderNoteStatus(note, pending) {
+    const el = document.getElementById('noteStatus'); if (!el) return;
+    if (pending) { el.textContent = 'Saving…'; return }
+    el.textContent = note.text.trim() ? 'Saved · ' + noteWhen(note.updatedAt) : 'Empty notes are not kept';
+}
+function noteTyped() {
+    const note = notesList().find(n => n.id === editingNoteId); if (!note) return;
+    note.text = document.getElementById('noteText').value;
+    note.updatedAt = new Date().toISOString();
+    renderNoteStatus(note, true);
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(() => { noteSaveTimer = null; flushNote() }, 500);
+}
+function flushNote() {
+    clearTimeout(noteSaveTimer); noteSaveTimer = null;
+    const note = notesList().find(n => n.id === editingNoteId);
+    if (save() && note) renderNoteStatus(note, false);
+}
+/* save what is typed, and drop the note if nothing was */
+function leaveCurrentNote() {
+    if (!editingNoteId) return;
+    const id = editingNoteId;
+    const note = notesList().find(n => n.id === id);
+    const pending = !!noteSaveTimer;
+    editingNoteId = null;
+    clearTimeout(noteSaveTimer); noteSaveTimer = null;
+    if (note && !note.text.trim()) {
+        store.notes = notesList().filter(n => n.id !== id);
+        save();
+    } else if (pending) save();
+}
+function deleteCurrentNote() {
+    const note = notesList().find(n => n.id === editingNoteId); if (!note) return;
+    if (note.text.trim() && !confirm(`Delete "${noteTitle(note)}"? This cannot be undone.`)) return;
+    store.notes = notesList().filter(n => n.id !== note.id);
+    editingNoteId = null;
+    clearTimeout(noteSaveTimer); noteSaveTimer = null;
+    save();
+    notesShowList();
+    showToast('Note deleted');
+}
+/* closing the tab mid-sentence still keeps the last few keystrokes */
+window.addEventListener('pagehide', () => { if (noteSaveTimer) flushNote() });
+
+/* ════════════════════════════════════════════════════════════════
+   CALCULATOR
+
+   A plain four-function calculator. The expression is kept as text
+   and parsed here (never eval'd), so a stray key can't run anything.
+   % divides the number before it by 100.
+   ════════════════════════════════════════════════════════════════ */
+let calcExprText = '';
+let calcJustDone = false;
+const CALC_OPS = '+-*/';
+
+function openCalc() {
+    document.getElementById('calcModal').classList.add('open');
+    renderCalc();
+}
+function closeCalc() { document.getElementById('calcModal').classList.remove('open') }
+
+function calcTokens(src) {
+    const out = [];
+    let i = 0;
+    while (i < src.length) {
+        const c = src[i];
+        if (/[\d.]/.test(c)) {
+            let j = i; while (j < src.length && /[\d.]/.test(src[j])) j++;
+            out.push({ t: 'n', v: parseFloat(src.slice(i, j)) }); i = j;
+        } else if (c === '%') { out.push({ t: '%' }); i++ }
+        else if (CALC_OPS.includes(c)) {
+            const prev = out[out.length - 1];
+            /* a minus with nothing number-like before it is a sign */
+            if (c === '-' && (!prev || prev.t === 'op' || prev.t === 'neg')) out.push({ t: 'neg' });
+            else out.push({ t: 'op', v: c });
+            i++;
+        } else i++;
+    }
+    return out;
+}
+/* returns a number, or null while the expression is still incomplete */
+function calcEval(src) {
+    const toks = calcTokens(src);
+    let pos = 0;
+    const prec = { '+': 1, '-': 1, '*': 2, '/': 2 };
+    function primary() {
+        const tk = toks[pos];
+        if (!tk) return null;
+        if (tk.t === 'neg') { pos++; const v = primary(); return v === null ? null : -v }
+        if (tk.t !== 'n' || isNaN(tk.v)) return null;
+        pos++;
+        let v = tk.v;
+        while (toks[pos] && toks[pos].t === '%') { v /= 100; pos++ }
+        return v;
+    }
+    function expr(minPrec) {
+        let left = primary();
+        if (left === null) return null;
+        while (toks[pos] && toks[pos].t === 'op' && prec[toks[pos].v] >= minPrec) {
+            const op = toks[pos].v; pos++;
+            const right = expr(prec[op] + 1);
+            if (right === null) return null;
+            if (op === '+') left += right;
+            else if (op === '-') left -= right;
+            else if (op === '*') left *= right;
+            else left = right === 0 ? NaN : left / right;
+        }
+        return left;
+    }
+    const v = expr(1);
+    if (v === null || pos !== toks.length) return null;
+    return v;
+}
+function calcRound(v) { return Math.round(v * 1e10) / 1e10 }
+function calcFormat(v) {
+    if (v === null) return '';
+    if (!isFinite(v)) return 'Cannot divide by 0';
+    const r = calcRound(v);
+    const abs = String(Math.abs(r));
+    if (abs.includes('e')) return (r < 0 ? '−' : '') + abs;
+    const [ip, dp] = abs.split('.');
+    return (r < 0 ? '−' : '') + ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dp ? '.' + dp : '');
+}
+function calcPretty(src) {
+    let out = '';
+    for (let i = 0; i < src.length; i++) {
+        const c = src[i], prev = src[i - 1];
+        if (c === '*') out += ' × ';
+        else if (c === '/') out += ' ÷ ';
+        else if (c === '+') out += ' + ';
+        else if (c === '-') out += (prev && /[\d%.]/.test(prev)) ? ' − ' : '−';
+        else out += c;
+    }
+    return out;
+}
+/* the number currently being typed at the end of the expression */
+function calcLastNumber() {
+    const m = calcExprText.match(/(\d*\.?\d*)$/);
+    return m ? m[1] : '';
+}
+function calcPress(k) {
+    let s = calcExprText;
+    const last = s.slice(-1);
+    if (k === 'C') { s = ''; calcJustDone = false }
+    else if (k === 'back') { s = calcJustDone ? '' : s.slice(0, -1); calcJustDone = false }
+    else if (k === '=') {
+        const v = calcEval(s);
+        if (v === null) return;
+        if (!isFinite(v)) { renderCalc(); return }
+        calcExprText = String(calcRound(v));
+        calcJustDone = true;
+        renderCalc(true);
+        return;
+    }
+    else if (/^\d$/.test(k)) {
+        if (calcJustDone) { s = ''; calcJustDone = false }
+        if (last === '%') s += '*';
+        const cur = calcLastNumber();
+        if (cur === '0') s = s.slice(0, -1);
+        s += k;
+    }
+    else if (k === '.') {
+        if (calcJustDone) { s = ''; calcJustDone = false }
+        if (calcLastNumber().includes('.')) return;
+        if (last === '%') s += '*';
+        if (!/\d/.test(last)) s += '0';
+        s += '.';
+    }
+    else if (CALC_OPS.includes(k)) {
+        calcJustDone = false;
+        if (s === '' || s === '-') { s = k === '-' ? '-' : s }
+        else if (CALC_OPS.includes(last)) {
+            /* allow 5 × −2, otherwise swap the operator */
+            if (k === '-' && (last === '*' || last === '/')) s += '-';
+            else s = s.replace(/[+\-*/]+$/, '') + k;
+        }
+        else if (last === '.') s = s.slice(0, -1) + k;
+        else s += k;
+    }
+    else if (k === '%') {
+        calcJustDone = false;
+        if (/[\d%]/.test(last)) s += '%';
+    }
+    else if (k === 'neg') {
+        calcJustDone = false;
+        /* flip the sign of the number being typed (or the result) */
+        const m = s.match(/(\d*\.?\d*%*)$/);
+        const num = m ? m[1] : '';
+        if (!num) {
+            if (s === '') s = '-';
+            else if (s === '-') s = '';
+            else if (last === '-' && /[*/]$/.test(s.slice(0, -1))) s = s.slice(0, -1);
+            else if (/[*/]$/.test(s)) s += '-';
+        } else {
+            const head = s.slice(0, s.length - num.length);
+            const sign = head.slice(-1);
+            const before = head.slice(0, -1);
+            if (head === '') s = '-' + num;
+            else if (sign === '-' && (before === '' || /[*/+\-]$/.test(before))) s = before + num; /* drop a leading sign */
+            else if (sign === '-') s = before + '+' + num;  /* a − b → a + b */
+            else if (sign === '+') s = before + '-' + num;  /* a + b → a − b */
+            else s = head + '-' + num;                      /* a × b → a × −b */
+        }
+    }
+    if (s.length > 60) return;
+    calcExprText = s;
+    renderCalc();
+}
+function renderCalc(done) {
+    const exprEl = document.getElementById('calcExpr');
+    const resEl = document.getElementById('calcResult');
+    if (!exprEl || !resEl) return;
+    const v = calcEval(calcExprText);
+    if (done) exprEl.textContent = ' ';
+    else exprEl.textContent = calcExprText ? calcPretty(calcExprText) : ' ';
+    if (calcExprText === '' || calcExprText === '-') resEl.textContent = '0';
+    else if (v !== null) resEl.textContent = calcFormat(v);
+    resEl.classList.toggle('err', v !== null && !isFinite(v));
+}
+function calcCopy() {
+    const v = calcEval(calcExprText);
+    if (v === null || !isFinite(v)) return;
+    const text = String(calcRound(v));
+    const done = () => showToast('Copied ' + text);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => { });
+    else {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); done() } catch (e) { } ta.remove();
+    }
+}
+/* type straight into it while it is the dialogue on top */
+document.addEventListener('keydown', ev => {
+    const modal = document.getElementById('calcModal');
+    if (!modal || !modal.classList.contains('open') || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (typeof isLocked === 'function' && isLocked()) return;
+    if (typeof topModal === 'function' && topModal() !== modal) return;
+    /* Enter/Space on Close or Copy should still press that button */
+    if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest && ev.target.closest('.calc-close, .calc-copy')) return;
+    const map = { Enter: '=', '=': '=', Backspace: 'back', Delete: 'C', c: 'C', C: 'C', ',': '.', x: '*', X: '*' };
+    const k = map[ev.key] || ev.key;
+    if (/^[\d.+\-*/%]$/.test(k) || k === '=' || k === 'back' || k === 'C') {
+        ev.preventDefault();
+        calcPress(k);
+    }
+});
+
 function toggleReportMonth(id) { const el = document.getElementById(id); if (el) el.classList.toggle('open') }
 
 function buildReport() {
@@ -1888,7 +2242,7 @@ function closeBackup() { document.getElementById('backupModal').classList.remove
 function exportData() {
     const backup = {
         _bank_backup: true, _version: 4, _exportedAt: new Date().toISOString(),
-        active: store.active, settings: store.settings, accounts: store.accounts,
+        active: store.active, settings: store.settings, accounts: store.accounts, notes: notesList(),
         /* the logo and backdrop live outside the records, so they are
            attached here on purpose rather than by accident */
         media: loadMedia()
@@ -1927,6 +2281,7 @@ function confirmImport() {
     recoveryMode = false;   /* the user has chosen; saving is safe again */
     if (pendingImportData && pendingImportData.media) saveMedia(pendingImportData.media);
     if (!pendingImportData) return; const { _bank_backup, _maribank_backup, _version, _exportedAt, ...restored } = pendingImportData;
+    if (restored.accounts && !Array.isArray(restored.notes)) restored.notes = notesList();
     if (restored.accounts) adoptStore(restored, !restored.settings);
     else { store.accounts[store.active] = normalizeAccount(restored); state = store.accounts[store.active] }
     save(); closeBackup(); applySettings(); applyAppearance(); syncAccountUI(); render();
@@ -1956,6 +2311,8 @@ function mergeImport() {
     if (!pendingImportData) return; const { _bank_backup, _maribank_backup, _version, _exportedAt, ...incoming } = pendingImportData;
     if (incoming.accounts) { mergeInto(store.accounts.bank, incoming.accounts.bank); mergeInto(store.accounts.cash, incoming.accounts.cash) }
     else mergeInto(state, incoming);
+    const haveNotes = new Set(notesList().map(n => n.id));
+    normalizeNotes(incoming.notes).forEach(n => { if (!haveNotes.has(n.id)) store.notes.push(n) });
     save(); closeBackup(); render(); showToast('Data merged');
 }
 
@@ -3973,6 +4330,8 @@ const MODAL_CLOSERS = {
     goalAddModal: closeGoalAdd,
     chartsModal: closeCharts,
     reportModal: closeReport,
+    calcModal: closeCalc,
+    notesModal: closeNotes,
     logsModal: closeLogs,
     backupModal: closeBackup,
     addCatBudgetModal: closeAddCatBudget,
