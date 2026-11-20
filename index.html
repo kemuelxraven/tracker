@@ -812,8 +812,9 @@
                         category, type, note, and the amount under <em>Money in</em> or <em>Money out</em>.</li>
                     <li><strong>Monthly summary</strong> — one row per month: money in, transfers, money set
                         aside, spent, loan payments, total out, budgeted and net.</li>
-                    <li><strong>Category budgets</strong> — budget, spent, left and percent used per
-                        category. Rows you overspent are shaded red and marked <em>Over budget</em>.</li>
+                    <li><strong>Category by month</strong> — the exact amount spent and the exact loan
+                        payments for each category in each month, kept in separate columns. Budgets and
+                        carried-over balances are not included.</li>
                     <li><strong>Print / Save as PDF</strong> — a clean printed sheet: month-by-month totals,
                         budget against actual, savings goals, then every entry. In the print window choose your
                         printer, or <em>Save as PDF</em> to get a file.</li>
@@ -1185,7 +1186,7 @@
                 <div class="export-actions">
                     <button class="export-btn" onclick="exportTransactionsCsv()">Transactions</button>
                     <button class="export-btn" onclick="exportSummaryCsv()">Monthly summary</button>
-                    <button class="export-btn" onclick="exportBudgetsCsv()">Category budgets</button>
+                    <button class="export-btn" onclick="exportBudgetsCsv()">Category by month</button>
                     <button class="export-btn primary" onclick="printReport()">Print / Save as PDF</button>
                 </div>
                 <p class="export-hint" id="exportHint"></p>

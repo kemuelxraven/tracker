@@ -718,14 +718,34 @@ function setBaseBudget(cat, period, amount) {
    out, so they stay in Total Spent and the account balance. It simply stops
    showing, and from the month it was deleted it holds no budget. */
 function liveCats() { return state.categories.filter(c => !c.archived) }
-/* Only last month's leftover rolls into this one: its own allowance minus
-   what was spent in it. Older months do not pile on. Overspending never
-   carries as debt. */
+/* What rolls into a month is exactly what was still unspent at the end of the
+   month before it: that month's allowance PLUS whatever it had itself carried
+   in, minus what was spent in it. So a category with 1,700 and 1,100 spent
+   hands 600 to the next month, and if that month spends nothing, the 600
+   keeps going. Overspending never carries as debt (floored at 0).
+   The chain starts at the category's first month (created, budgeted or
+   spent in), so months before it existed contribute nothing. */
 function carriedIn(cat, period) {
     const key = period || activePeriod;
     if (cat.archived && cat.archivedPeriod && key > cat.archivedPeriod) return 0;
-    const prev = shiftPeriod(key, -1);
-    return Math.max(0, baseBudget(cat, prev) - catSpent(cat, prev));
+    const spentBy = {};
+    (cat.expenses || []).forEach(e => {
+        const p = periodOf(e);
+        spentBy[p] = (spentBy[p] || 0) + (Number(e.amount) || 0);
+    });
+    const seen = Object.keys(spentBy).concat(Object.keys(cat.periods || {}));
+    if (cat.createdPeriod) seen.push(cat.createdPeriod);
+    const valid = seen.filter(k => /^\d{4}-\d{2}$/.test(k) && k !== '0000-00');
+    if (!valid.length) return 0;
+    const start = valid.reduce((a, b) => (b < a ? b : a));
+    if (key <= start) return 0;
+    let carry = 0, p = start, guard = 0;
+    while (p < key && guard++ < 1200) {
+        const allowance = (cat.archived && cat.archivedPeriod && p >= cat.archivedPeriod) ? 0 : baseBudget(cat, p) + carry;
+        carry = Math.max(0, allowance - (spentBy[p] || 0));
+        p = shiftPeriod(p, 1);
+    }
+    return carry;
 }
 function catBudget(cat, period) {
     const key = period || activePeriod;
@@ -2243,6 +2263,10 @@ function exportData() {
     const backup = {
         _bank_backup: true, _version: 4, _exportedAt: new Date().toISOString(),
         active: store.active, settings: store.settings, accounts: store.accounts, notes: notesList(),
+        /* a readable copy of the exact spent and loan per category per
+           month, straight from the records above. Restoring rebuilds from
+           the records, so this is for checking and for reading the file. */
+        categoryMonths: { bank: categoryMonthLedger(store.accounts.bank), cash: categoryMonthLedger(store.accounts.cash) },
         /* the logo and backdrop live outside the records, so they are
            attached here on purpose rather than by accident */
         media: loadMedia()
@@ -2301,7 +2325,15 @@ function mergeInto(target, incoming) {
     (incoming.goals || []).forEach(g => { if (!existingGoalIds.has(g.id)) target.goals.push(g) });
     (incoming.categories || []).forEach(inCat => {
         const existing = target.categories.find(c => c.name.toLowerCase() === inCat.name.toLowerCase());
-        if (existing) { const existingIds = new Set(existing.expenses.map(e => e.id)); (inCat.expenses || []).forEach(e => { if (!existingIds.has(e.id)) existing.expenses.push(e) }) }
+        if (existing) {
+            const existingIds = new Set(existing.expenses.map(e => e.id)); (inCat.expenses || []).forEach(e => { if (!existingIds.has(e.id)) existing.expenses.push(e) });
+            /* a month's own budget belongs to the category, so it comes
+               along too; a month already set here is left as it is */
+            if (!existing.periods) existing.periods = {};
+            const inPeriods = (inCat.periods && typeof inCat.periods === 'object') ? inCat.periods : {};
+            Object.keys(inPeriods).forEach(k => { if (existing.periods[k] === undefined) existing.periods[k] = inPeriods[k] });
+            if (inCat.createdPeriod && (!existing.createdPeriod || inCat.createdPeriod < existing.createdPeriod)) existing.createdPeriod = inCat.createdPeriod;
+        }
         else target.categories.push({ ...inCat, id: uid() });
     });
 }
@@ -3195,6 +3227,45 @@ function exportBudgets() {
     return out;
 }
 
+/* ── exact spending per category per month ──
+   Straight from the expense records: what was spent and what went to loan
+   payments, kept apart. Nothing derived is mixed in — no allowance and no
+   carried-over balance, since those are worked out from the records and
+   are never stored. Used by the Category export and by the JSON backup. */
+function categoryMonthLedger(acct) {
+    const out = [];
+    ((acct && acct.categories) || []).forEach(cat => {
+        const by = {};
+        (cat.expenses || []).forEach(e => {
+            const p = periodOf(e);
+            const m = by[p] || (by[p] = { spent: 0, loan: 0, entries: 0 });
+            if (expType(e) === 'loan') m.loan += Number(e.amount) || 0;
+            else m.spent += Number(e.amount) || 0;
+            m.entries++;
+        });
+        Object.keys(by).sort().forEach(p => out.push({
+            category: cat.name, month: p,
+            spent: Math.round(by[p].spent * 100) / 100,
+            loan: Math.round(by[p].loan * 100) / 100,
+            entries: by[p].entries
+        }));
+    });
+    return out;
+}
+function exportCategoryMonths() {
+    const only = exportMonthKey();
+    const out = [];
+    exportAccountKeys().forEach(key => {
+        const label = accountLabel(key);
+        categoryMonthLedger(store.accounts[key]).forEach(r => {
+            if (r.month === '0000-00' || (only && r.month !== only)) return;
+            if (r.spent <= 0.005 && r.loan <= 0.005) return;
+            out.push({ period: r.month, account: label, name: r.category, spent: r.spent, loan: r.loan, entries: r.entries });
+        });
+    });
+    return out.sort((a, b) => a.period.localeCompare(b.period) || a.account.localeCompare(b.account) || a.name.localeCompare(b.name));
+}
+
 /* ── ONE TABLE DEFINITION, TWO FILE FORMATS ──
    Each report is described once — its columns, how each column should be
    read and how it should be shown — and both writers below work from that
@@ -3246,23 +3317,19 @@ function exportTable(kind) {
             ]
         };
     }
-    const rows = exportBudgets();
+    const rows = exportCategoryMonths();
     return {
-        kind, sheet: 'Category budgets', title: 'Category budgets',
+        kind, sheet: 'Category by month', title: 'Category by month',
         countLabel: 'Rows', rows,
-        note: 'Rows over budget are shaded red. A blank Used % means no allowance was set that month.',
-        /* the whole row goes red when the category was overspent, which is
-           the one thing a reader scans this sheet for */
-        warn: r => r.left < -0.005,
+        note: 'The exact spent and loan payments recorded for each category in each month. Budgets and carried-over balances are not included.',
         cols: [
             { label: 'Month', w: 22, get: r => periodLabel(r.period) },
             { label: 'Account', w: 12, get: r => r.account },
             { label: 'Category', w: 24, get: r => r.name },
-            { label: 'Budget', w: 14, type: 'money', total: true, get: r => r.budget },
             { label: 'Spent', w: 14, type: 'money', total: true, get: r => r.spent },
-            { label: 'Left', w: 14, type: 'money', total: true, get: r => r.left },
-            { label: 'Used %', w: 10, type: 'pct', get: r => r.pct },
-            { label: 'Status', w: 14, get: r => r.left < -0.005 ? 'Over budget' : 'Within budget' },
+            { label: 'Loan payments', w: 15, type: 'money', total: true, get: r => r.loan },
+            { label: 'Total out', w: 14, type: 'money', total: true, get: r => r.spent + r.loan },
+            { label: 'Entries', w: 9, get: r => r.entries },
             { label: 'Month key', w: 11, get: r => r.period }
         ]
     };
@@ -3564,7 +3631,7 @@ function exportReport(kind, slug, empty) {
 }
 function exportTransactionsCsv() { exportReport('transactions', 'transactions', 'Nothing to export for that range') }
 function exportSummaryCsv() { exportReport('summary', 'monthly-summary', 'Nothing to export for that range') }
-function exportBudgetsCsv() { exportReport('budgets', 'category-budgets', 'No categories to export for that range') }
+function exportBudgetsCsv() { exportReport('budgets', 'category-by-month', 'No spending to export for that range') }
 
 /* ── the printed sheet ── */
 function prMoney(n) { return fmt(n) }
