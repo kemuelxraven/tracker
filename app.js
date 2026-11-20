@@ -2257,16 +2257,41 @@ function categoryMonthLedger(acct) {
         if (valid.length) { let p = valid[0], g = 0; while (p <= last && g++ < 1200) { months.add(p); p = shiftPeriod(p, 1) } }
         Array.from(months).sort().forEach(p => {
             const m = by[p] || { spent: 0, loan: 0, payments: [] };
-            out.push({
+            const dated = p !== '0000-00';
+            const spent = Math.round(m.spent * 100) / 100, loan = Math.round(m.loan * 100) / 100;
+            const carried = dated ? carriedIn(cat, p) : 0;
+            const total = dated ? catBudget(cat, p) : 0;
+            const row = {
                 categoryId: cat.id, category: cat.name, month: p,
-                budget: p === '0000-00' ? 0 : baseBudget(cat, p),
-                spent: Math.round(m.spent * 100) / 100,
-                loan: Math.round(m.loan * 100) / 100,
+                budget: dated ? baseBudget(cat, p) : 0,
+                /* what came in from the month before, and what this month ended
+                   (or stands) at: allowance + carried in − spent − loan */
+                carriedIn: Math.round(carried * 100) / 100,
+                totalBudget: Math.round(total * 100) / 100,
+                spent, loan,
+                remaining: Math.round((total - m.spent - m.loan) * 100) / 100,
                 payments: m.payments
-            });
+            };
+            if (cat.archived) row.archived = true;
+            out.push(row);
         });
     });
     return out;
+}
+/* The same rows added up per month, for reading the file by eye and for the
+   preview before a restore. Deleted (archived) categories stay out, the way
+   they stay out of the month totals on screen. */
+function monthSummaryFromLedger(rows) {
+    const by = {};
+    (rows || []).forEach(r => {
+        if (!r || r.archived || !MONTH_KEY_RE.test(r.month) || r.month === '0000-00') return;
+        const s = by[r.month] || (by[r.month] = { month: r.month, budget: 0, carriedIn: 0, totalBudget: 0, spent: 0, loan: 0, remaining: 0 });
+        ['budget', 'carriedIn', 'totalBudget', 'spent', 'loan', 'remaining'].forEach(k => { s[k] += Number(r[k]) || 0 });
+    });
+    return Object.keys(by).sort().map(k => {
+        const s = by[k]; Object.keys(s).forEach(f => { if (f !== 'month') s[f] = Math.round(s[f] * 100) / 100 });
+        return s;
+    });
 }
 function findCatForRow(acct, row) {
     return (acct.categories || []).find(c => row.categoryId && c.id === row.categoryId)
@@ -2314,14 +2339,25 @@ function applyCategoryMonths(acct, rows) {
 }
 /* After a restore: does every category and month now read what the file says? */
 function verifyCategoryMonths(acct, rows) {
-    const res = { checked: 0, off: 0 };
+    const res = { checked: 0, off: 0, details: [] };
     if (!acct || !Array.isArray(rows)) return res;
+    const differs = (a, b) => Math.abs(a - (Number(b) || 0)) > 0.005;
+    const has = v => v !== undefined && v !== null && !isNaN(Number(v));
     rows.forEach(row => {
         if (!row || !MONTH_KEY_RE.test(row.month) || row.month === '0000-00') return;
         const cat = findCatForRow(acct, row); res.checked++;
-        if (!cat || Math.abs(catSpentOnly(cat, row.month) - (Number(row.spent) || 0)) > 0.005
-            || Math.abs(catLoanOnly(cat, row.month) - (Number(row.loan) || 0)) > 0.005
-            || Math.abs(baseBudget(cat, row.month) - (Number(row.budget) || 0)) > 0.005) res.off++;
+        const bad = [];
+        if (!cat) bad.push('category missing');
+        else {
+            const total = catBudget(cat, row.month), spent = catSpentOnly(cat, row.month), loan = catLoanOnly(cat, row.month);
+            if (differs(spent, row.spent)) bad.push(`spent ${spent} vs file ${row.spent}`);
+            if (differs(loan, row.loan)) bad.push(`loan ${loan} vs file ${row.loan}`);
+            if (differs(baseBudget(cat, row.month), row.budget)) bad.push(`budget ${baseBudget(cat, row.month)} vs file ${row.budget}`);
+            /* files from before carried-over/remaining were recorded simply lack these */
+            if (has(row.carriedIn) && differs(carriedIn(cat, row.month), row.carriedIn)) bad.push(`carried in ${carriedIn(cat, row.month)} vs file ${row.carriedIn}`);
+            if (has(row.remaining) && differs(total - spent - loan, row.remaining)) bad.push(`remaining ${Math.round((total - spent - loan) * 100) / 100} vs file ${row.remaining}`);
+        }
+        if (bad.length) { res.off++; res.details.push(`${row.category} · ${row.month}: ${bad.join('; ')}`) }
     });
     return res;
 }
@@ -2348,6 +2384,8 @@ function exportData() {
         active: store.active, settings: store.settings, accounts: store.accounts, notes: notesList(),
         /* budget, spent, loan and every payment, per category and month */
         categoryMonths: { bank: categoryMonthLedger(store.accounts.bank), cash: categoryMonthLedger(store.accounts.cash) },
+        /* and what each month's remaining added up to, per account */
+        monthSummary: { bank: monthSummaryFromLedger(categoryMonthLedger(store.accounts.bank)), cash: monthSummaryFromLedger(categoryMonthLedger(store.accounts.cash)) },
         /* the logo and backdrop live outside the records, so they are
            attached here on purpose rather than by accident */
         media: loadMedia()
@@ -2383,7 +2421,17 @@ function processImportFile(file) {
             bal -= spentSum + loanSum;
             /* what the file holds, in money, to check against the device it
                came from before anything here is replaced */
-            const tally = `Spent ${fmt(spentSum)} · Loan ${fmt(loanSum)} · Remaining after restore ${fmt(bal)}.`;
+            let tally = `Spent ${fmt(spentSum)} · Loan ${fmt(loanSum)} · Remaining after restore ${fmt(bal)}.`;
+            /* each month's remaining, as the file recorded it */
+            const ms = data.monthSummary && !Array.isArray(data.monthSummary) ? data.monthSummary : null;
+            const nowKey = thisPeriod();
+            const monthLine = key => {
+                const list = ms ? ms[key] : null; if (!Array.isArray(list) || !list.length) return '';
+                const m = list.find(r => r.month === nowKey) || list[list.length - 1];
+                return `${accountLabel(key)} ${periodLabel(m.month)}: ${fmt(m.remaining)} left of ${fmt(m.totalBudget)}`;
+            };
+            const lines = data.accounts ? ACCOUNT_KEYS.map(monthLine).filter(Boolean) : [];
+            if (lines.length) tally += ` Category budgets in the file — ${lines.join(' · ')}.`;
             const exportedAt = data._exportedAt ? new Date(data._exportedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'unknown date';
             const scope = data.accounts ? 'both the Bank and Cash tabs' : `the ${activeLabel()} tab`;
             document.getElementById('importWarning').innerHTML = `⚠️ <strong>This will replace the data in ${scope}.</strong> The backup from <strong>${exportedAt}</strong> contains ${cats} categor${cats === 1 ? 'y' : 'ies'} and ${exps} expense${exps === 1 ? '' : 's'}. ${tally} Export first if needed!`;
@@ -2404,14 +2452,18 @@ function confirmImport() {
     const cm = pendingImportData.categoryMonths;
     const targets = restored.accounts ? ACCOUNT_KEYS.map(k => [store.accounts[k], cm && !Array.isArray(cm) ? cm[k] : null])
         : [[state, Array.isArray(cm) ? cm : null]];
-    let checked = 0, off = 0;
+    let checked = 0, off = 0; const details = [];
     targets.forEach(([acct, rows]) => {
         if (!Array.isArray(rows)) return;
         applyCategoryMonths(acct, rows);
-        const v = verifyCategoryMonths(acct, rows); checked += v.checked; off += v.off;
+        const v = verifyCategoryMonths(acct, rows); checked += v.checked; off += v.off; details.push(...v.details);
     });
     save(); closeBackup(); applySettings(); applyAppearance(); syncAccountUI(); render();
     showToast(!checked ? 'Data restored' : off ? `Data restored — ${off} of ${checked} category-months do not match the file` : `Data restored ✓ — all ${checked} category-months match`);
+    if (details.length) {
+        console.warn('Restore mismatches:', details);
+        alert(`${off} of ${checked} category-months do not match the file:\n\n` + details.slice(0, 8).join('\n') + (details.length > 8 ? `\n…and ${details.length - 8} more (see the browser console).` : ''));
+    }
 }
 function mergeInto(target, incoming) {
     if (!incoming) return;
