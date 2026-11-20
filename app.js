@@ -2290,11 +2290,22 @@ function processImportFile(file) {
             if (!data._bank_backup && !data._maribank_backup) { showToast('Not a valid Bank backup file'); return }
             pendingImportData = data;
             const sources = data.accounts ? [data.accounts.bank, data.accounts.cash] : [data];
-            let cats = 0, exps = 0;
-            sources.forEach(a => { const cs = (a && a.categories) || []; cats += cs.length; exps += cs.reduce((s, c) => s + ((c.expenses || []).length), 0) });
+            let cats = 0, exps = 0, spentSum = 0, loanSum = 0, bal = 0;
+            sources.forEach(a => {
+                const cs = (a && a.categories) || []; cats += cs.length;
+                cs.forEach(c => (c.expenses || []).forEach(e => {
+                    exps++; const amt = Number(e.amount) || 0;
+                    if (expType(e) === 'loan') loanSum += amt; else spentSum += amt;
+                }));
+                bal += (Number(a && a.totalBudget) || 0);
+            });
+            bal -= spentSum + loanSum;
+            /* what the file holds, in money, so a transfer can be checked
+               against the device it came from before anything is replaced */
+            const tally = `Spent ${fmt(spentSum)} · Loan ${fmt(loanSum)} · Remaining after restore ${fmt(bal)}.`;
             const exportedAt = data._exportedAt ? new Date(data._exportedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'unknown date';
             const scope = data.accounts ? 'both the Bank and Cash tabs' : `the ${activeLabel()} tab`;
-            document.getElementById('importWarning').innerHTML = `⚠️ <strong>This will replace the data in ${scope}.</strong> The backup from <strong>${exportedAt}</strong> contains ${cats} categor${cats === 1 ? 'y' : 'ies'} and ${exps} expense${exps === 1 ? '' : 's'}. Export first if needed!`;
+            document.getElementById('importWarning').innerHTML = `⚠️ <strong>This will replace the data in ${scope}.</strong> The backup from <strong>${exportedAt}</strong> contains ${cats} categor${cats === 1 ? 'y' : 'ies'} and ${exps} expense${exps === 1 ? '' : 's'}. ${tally} Export first if needed!`;
             document.getElementById('importWarning').classList.add('show');
             document.getElementById('btnConfirmImport').classList.add('show');
             document.getElementById('btnMergeImport').classList.add('show');
@@ -2308,8 +2319,14 @@ function confirmImport() {
     if (restored.accounts && !Array.isArray(restored.notes)) restored.notes = notesList();
     if (restored.accounts) adoptStore(restored, !restored.settings);
     else { store.accounts[store.active] = normalizeAccount(restored); state = store.accounts[store.active] }
+    /* anything listed per category and month that the records above do not
+       already hold goes back under its category and month */
+    const cm = pendingImportData.categoryMonths;
+    let placed = 0;
+    if (cm && !Array.isArray(cm)) ACCOUNT_KEYS.forEach(k => { placed += applyCategoryMonths(restored.accounts ? store.accounts[k] : (k === store.active ? state : null), cm[k]) });
+    else if (Array.isArray(cm) && !restored.accounts) placed += applyCategoryMonths(state, cm);
     save(); closeBackup(); applySettings(); applyAppearance(); syncAccountUI(); render();
-    showToast('Data restored');
+    showToast(placed ? `Data restored · ${placed} payment${placed === 1 ? '' : 's'} placed back` : 'Data restored');
 }
 function mergeInto(target, incoming) {
     if (!incoming) return;
@@ -2343,6 +2360,9 @@ function mergeImport() {
     if (!pendingImportData) return; const { _bank_backup, _maribank_backup, _version, _exportedAt, ...incoming } = pendingImportData;
     if (incoming.accounts) { mergeInto(store.accounts.bank, incoming.accounts.bank); mergeInto(store.accounts.cash, incoming.accounts.cash) }
     else mergeInto(state, incoming);
+    const cm = incoming.categoryMonths;
+    if (cm && !Array.isArray(cm)) ACCOUNT_KEYS.forEach(k => applyCategoryMonths(incoming.accounts ? store.accounts[k] : (k === store.active ? state : null), cm[k]));
+    else if (Array.isArray(cm) && !incoming.accounts) applyCategoryMonths(state, cm);
     const haveNotes = new Set(notesList().map(n => n.id));
     normalizeNotes(incoming.notes).forEach(n => { if (!haveNotes.has(n.id)) store.notes.push(n) });
     save(); closeBackup(); render(); showToast('Data merged');
@@ -3238,19 +3258,60 @@ function categoryMonthLedger(acct) {
         const by = {};
         (cat.expenses || []).forEach(e => {
             const p = periodOf(e);
-            const m = by[p] || (by[p] = { spent: 0, loan: 0, entries: 0 });
+            const m = by[p] || (by[p] = { spent: 0, loan: 0, entries: 0, payments: [] });
             if (expType(e) === 'loan') m.loan += Number(e.amount) || 0;
             else m.spent += Number(e.amount) || 0;
             m.entries++;
+            m.payments.push(Object.assign({}, e));
         });
         Object.keys(by).sort().forEach(p => out.push({
-            category: cat.name, month: p,
+            categoryId: cat.id, category: cat.name, month: p,
             spent: Math.round(by[p].spent * 100) / 100,
             loan: Math.round(by[p].loan * 100) / 100,
-            entries: by[p].entries
+            entries: by[p].entries,
+            /* every payment itself — note, amount, date, spent or loan — so
+               the backup holds what was paid, not only how much */
+            payments: by[p].payments
         }));
     });
     return out;
+}
+/* The other direction: put each payment back under its category and month.
+   A category is found by its id, then by its name, and made if it is not
+   there; a payment already present (same id) is left alone, so restoring
+   or merging the same file twice adds nothing. Returns how many were put
+   back. */
+function applyCategoryMonths(acct, rows) {
+    if (!acct || !Array.isArray(rows)) return 0;
+    if (!Array.isArray(acct.categories)) acct.categories = [];
+    const have = new Set();
+    acct.categories.forEach(c => (c.expenses || []).forEach(e => have.add(e.id)));
+    let added = 0;
+    const touched = new Set();
+    rows.forEach(row => {
+        if (!row || !Array.isArray(row.payments) || !row.payments.length) return;
+        let cat = acct.categories.find(c => row.categoryId && c.id === row.categoryId)
+            || acct.categories.find(c => typeof row.category === 'string' && c.name.toLowerCase() === row.category.toLowerCase());
+        row.payments.forEach(p => {
+            if (!p || typeof p !== 'object' || isNaN(Number(p.amount)) || !p.id || have.has(p.id)) return;
+            if (!cat) {
+                if (typeof row.category !== 'string' || !row.category) return;
+                cat = { id: row.categoryId || uid(), name: row.category, budget: 0, expenses: [], periods: {}, createdPeriod: /^\d{4}-\d{2}$/.test(row.month) ? row.month : undefined };
+                acct.categories.push(cat);
+            }
+            const e = Object.assign({}, p);
+            /* a payment with no date of its own goes to the month it was filed under */
+            if (!e.dateRaw && !e.date && /^\d{4}-\d{2}$/.test(row.month) && row.month !== '0000-00') {
+                e.dateRaw = periodStartISO(row.month); e.date = isoToLabel(e.dateRaw);
+            }
+            if (!cat.expenses) cat.expenses = [];
+            cat.expenses.push(e); have.add(e.id); added++; touched.add(cat);
+        });
+    });
+    /* newest first, the way the category lists them */
+    touched.forEach(c => c.expenses.sort((a, b) =>
+        String(b.dateRaw || '').localeCompare(String(a.dateRaw || '')) || (Number(b.loggedAt) || 0) - (Number(a.loggedAt) || 0)));
+    return added;
 }
 function exportCategoryMonths() {
     const only = exportMonthKey();
